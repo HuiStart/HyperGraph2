@@ -1,9 +1,11 @@
 写好了，就一个命令：
 ```bash
-python scripts/evaluate_full.py \
-    --ground-truth data/processed/test_2024_processed.json \
-    --predictions experiments/baseline_fast_2024.json \
-    --output experiments/full_eval.json
+python scripts/run_and_evaluate.py \
+    --input data/processed/test_2024_processed.json \
+    --mode fast \
+    --output-pred experiments/pred_fast.json \
+    --output-metrics experiments/metrics_fast.json \
+    --max-samples 5
 ```
 只跑前 5 条测试：
 ```bash
