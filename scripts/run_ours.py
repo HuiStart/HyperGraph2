@@ -17,11 +17,11 @@ from src.agents.workflow import ReviewWorkflow
 
 def main():
     parser = argparse.ArgumentParser(description="Run our enhanced scoring method")
-    parser.add_argument("--input", default="data/processed/deepreview_processed.json",
+    parser.add_argument("--input","-i", default="data/processed/deepreview_processed.json",
                         help="Input processed data path")
-    parser.add_argument("--output", default="experiments/ours_results.json",
+    parser.add_argument("--output","-o" ,default="experiments/ours_results.json",
                         help="Output path for results")
-    parser.add_argument("--samples", type=int, default=None,
+    parser.add_argument("--samples","-n", type=int, default=None,
                         help="Max number of samples to score")
     parser.add_argument("--llm-config", default="configs/llm.yaml",
                         help="LLM config path")
