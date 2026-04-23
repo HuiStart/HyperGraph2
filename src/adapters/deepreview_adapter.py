@@ -239,22 +239,35 @@ def adapt_csv_row(row: dict[str, str]) -> dict[str, Any] | None:
     if title_match:
         title = title_match.group(1)
 
-    # Parse ground truth rating list, e.g. "[5, 6, 6, 5]"
+    # Parse human reviews from reviewer_comments
+    parsed_reviews = []
+    comments_raw = row.get("reviewer_comments", "")
+    if comments_raw:
+        try:
+            comments_list = json.loads(comments_raw)
+            if isinstance(comments_list, list):
+                parsed_reviews = [parse_human_review(r) for r in comments_list]
+        except json.JSONDecodeError:
+            pass
+
+    # Compute ground truth from human reviews (includes soundness/presentation/contribution)
+    ground_truth = compute_ground_truth(parsed_reviews)
+
+    # Override rating with explicit rating list if available
     rating_raw = row.get("rating", "")
     try:
         rating_list = ast.literal_eval(rating_raw) if rating_raw else []
-        if not isinstance(rating_list, list):
-            rating_list = []
+        if isinstance(rating_list, list) and rating_list:
+            ground_truth["rating"] = sum(rating_list) / len(rating_list)
     except Exception:
-        rating_list = []
+        pass
 
-    gt_rating = sum(rating_list) / len(rating_list) if rating_list else None
-
-    # Parse decision
+    # Override decision with paper-level decision if available
     decision_raw = row.get("decision", "")
-    gt_decision = "accept" if "accept" in decision_raw.lower() else "reject"
+    if decision_raw:
+        ground_truth["decision"] = "accept" if "accept" in decision_raw.lower() else "reject"
 
-    # Parse predicted scores from outputs (last assistant message)
+    # Parse predicted scores from outputs (last assistant message) for reference only
     pred_scores = {"rating": None, "soundness": None, "presentation": None, "contribution": None, "decision": "reject"}
     if outputs and isinstance(outputs, list):
         last_msg = outputs[-1]
@@ -273,20 +286,13 @@ def adapt_csv_row(row: dict[str, str]) -> dict[str, Any] | None:
         "id": row.get("id", ""),
         "title": title,
         "paper_context": paper_context,
-        "reviews": [],
-        "ground_truth": {
-            "rating": gt_rating,
-            "soundness": None,  # CSV does not have per-dimension human scores
-            "presentation": None,
-            "contribution": None,
-            "decision": gt_decision,
-        },
+        "reviews": parsed_reviews,
+        "ground_truth": ground_truth,
         "metadata": {
             "source": "deepreview_csv",
             "year": row.get("year", ""),
             "mode": row.get("mode", ""),
-            "num_human_reviewers": len(rating_list),
-            "reviewer_comments": row.get("reviewer_comments", ""),
+            "num_human_reviewers": len(parsed_reviews),
         },
         "raw_predictions": {
             "pred_scores": pred_scores,
