@@ -30,9 +30,7 @@
 ## 验证结果
 官方评估流程已在 `sample.json` 上跑通：
 ```bash
-python src/cli/main.py evaluate --official \
-    --input "Research/evaluate/DeepReview/sample.json" \
-    --output-dir "experiments/deepreview_baseline"
+python src/cli/main.py evaluate --official --input "Research/evaluate/DeepReview/sample.json" --output-dir "experiments/deepreview_baseline"
 ```
 
 三种模式的预测均被正确解析，评估指标已输出到：
@@ -42,8 +40,6 @@ python src/cli/main.py evaluate --official \
 - `experiments/deepreview_baseline/results_best.md`
 
 ### 快速开始
-
-
 
 ```bash
 # 1. 预处理
@@ -70,3 +66,83 @@ python scripts/run_ours.py --samples 10 --use-llm-evidence
 4. **Side-by-Side 评估**：实现双盲胜率对比（参考 `win_rate_evaluate.py` 的 prompt 模板）
 
 如果你希望我现在继续：接入完整数据集、运行实际 baseline 生成预测、或者实现 Side-by-Side 评估，请告诉我。
+
+
+
+## 4. 运行项目
+
+### 第一步：预处理数据
+
+
+
+```bash
+python src/cli/main.py preprocess --input "Research/evaluate/DeepReview/sample.json" --output "data/processed/deepreview_processed.json"
+```
+
+### 第二步：评估官方已有预测（无需调用 LLM）
+
+
+
+```bash
+python src/cli/main.py evaluate --official --input "Research/evaluate/DeepReview/sample.json" --output-dir "experiments/deepreview_baseline"
+```
+
+### 第三步：运行 Baseline 生成新预测
+
+
+
+```bash
+# 使用 cloud_default 模型（deepseek-r1:14b-16k）
+# 先测试 1 条样本确认能跑通
+python scripts/run_baseline.py --mode fast --samples 1 --llm-config configs/llm.yaml
+
+# 如果正常，再跑完整数据集
+python scripts/run_baseline.py --mode fast --llm-config configs/llm.yaml
+python scripts/run_baseline.py --mode standard --llm-config configs/llm.yaml
+python scripts/run_baseline.py --mode best --llm-config configs/llm.yaml
+```
+
+### 第四步：运行我们的增强方法
+
+
+
+```bash
+python scripts/run_ours.py --use-llm-evidence --llm-config configs/llm.yaml
+```
+
+### 第五步：运行消融实验
+
+
+
+```bash
+python scripts/run_ablation.py --variant full
+python scripts/run_ablation.py --variant no_hg
+python scripts/run_ablation.py --variant no_evidence
+python scripts/run_ablation.py --variant no_risk
+```
+
+## 5. 显存与长文本注意事项
+
+| 问题                       | 解决方案                                              |
+| -------------------------- | ----------------------------------------------------- |
+| 论文太长（40k tokens）     | 代码会自动截断到模型支持的 context_window             |
+| 14B 模型单卡 16GB 可能紧张 | Ollama 会自动 offload 到 CPU，或降低 `context_window` |
+| Best Mode 需要检索         | 默认使用本地 LLM fallback（不依赖 OpenScholar API）   |
+
+## 6. 验证输出
+
+运行完成后，检查结果文件：
+
+
+
+```bash
+ls experiments/
+# deepreview_baseline/    # 官方预测评估结果
+# baseline_fast.json      # Fast mode 新生成的预测
+# baseline_standard.json  # Standard mode 预测
+# baseline_best.json      # Best mode 预测
+# ours_results.json       # 我们的方法结果
+# ablation_*.json         # 消融实验结果
+```
+
+如果需要我把运行脚本改成后台批处理形式（nohup + 日志重定向），或者添加多进程并行加速，请告诉我。

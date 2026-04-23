@@ -21,7 +21,7 @@ ollama:
       top_p: 0.95
       max_tokens: 35000
       # 云服务器双卡16GB配置
-      context_window: 6000
+      context_window: 16384
 
 # 远程 API 配置（OpenAI兼容）
 openai:
