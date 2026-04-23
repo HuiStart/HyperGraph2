@@ -298,8 +298,8 @@ python scripts/evaluate_predictions.py \
 # 预处理 5 条
 python -m src.cli.main preprocess \
     --input data/deepreview/test_2024.csv \
-    --output data/processed/test_5.json \
-    --max-samples 5
+    --output data/processed/test_3.json \
+    --max-samples 3
 
 # Fast Mode 测试
 python scripts/run_baseline.py \
@@ -352,10 +352,10 @@ if soundness is None:
 
 ```bash
 python scripts/run_baseline.py \
-    --mode fast \
-    --input data/processed/test_2024_processed.json \
-    --output experiments/baseline_fast_2024_v2.json \
-    --llm-config configs/llm.yaml
+    --mode best \
+    --input data/processed/test_5.json \
+    --output experiments/baseline_best_2024.json \
+    --llm-config configs/llm.yaml 
 ```
 
 ## 2. 生成 true/pred 对比表格
@@ -364,8 +364,15 @@ python scripts/run_baseline.py \
 
 ```bash
 python scripts/generate_comparison_table.py \
-    --ground-truth data/processed/test_2024_processed.json \
-    --predictions experiments/baseline_fast_2024_v2.json \
+    --ground-truth data/processed/test_5.json \
+    --predictions experiments/baseline_best_2024.json \
     --output results_table.md \
-    --max-samples 20
+    --max-samples 5
+```
+
+```bash
+python scripts/evaluate_predictions.py \
+    -g data/processed/test_5.json \
+    -p experiments/test5.json \
+    --llm-config configs/llm.yaml 
 ```

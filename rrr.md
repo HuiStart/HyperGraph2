@@ -1,18 +1,16 @@
 写好了，就一个命令：
-
-
-
 ```bash
 python scripts/evaluate_full.py \
     --ground-truth data/processed/test_2024_processed.json \
     --predictions experiments/baseline_fast_2024.json \
     --output experiments/full_eval.json
 ```
+只跑前 5 条测试：
+```bash
+python scripts/evaluate_full.py -g data/processed/test_5.json -p experiments/baseline_fast_2024.json -n 5
+```
 
 **输出效果：**
-
-
-
 ```
 ====================================================================================================
 Sample   ID              Rating       Soundness    Presentation   Contribution   Decision        
@@ -33,12 +31,5 @@ Final Metrics
 | Decision F1 (macro) | 0.7234 |
 ```
 
-只跑前 5 条测试：
-
-
-
-```bash
-python scripts/evaluate_full.py -g data/processed/test_5.json -p experiments/baseline_fast_2024.json -n 5
-```
 
 如果你跑的 predictions 文件 pred 列还全是 `-`，把那条命令的输出贴给我，我帮你定位是 LLM 没调通还是 parser 问题。
