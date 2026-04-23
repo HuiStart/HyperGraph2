@@ -90,13 +90,17 @@ def compute_qwk(y_true: list[float], y_pred: list[float], max_rating: int = 10) 
         y_true_arr = np.array(y_true)
         y_pred_arr = np.array(y_pred)
 
+        # Round to integers for QWK (scores are continuous means)
+        y_true_int = np.round(y_true_arr).astype(int)
+        y_pred_int = np.round(y_pred_arr).astype(int)
+
         # Build confusion matrix
-        min_val = int(min(min(y_true_arr), min(y_pred_arr)))
-        max_val = int(max(max(y_true_arr), max(y_pred_arr)))
+        min_val = int(min(y_true_int.min(), y_pred_int.min()))
+        max_val = int(max(y_true_int.max(), y_pred_int.max()))
         num_classes = max_val - min_val + 1
 
         labels = list(range(min_val, max_val + 1))
-        cm = confusion_matrix(y_true_arr, y_pred_arr, labels=labels)
+        cm = confusion_matrix(y_true_int, y_pred_int, labels=labels)
 
         # Weights
         weights = np.zeros((num_classes, num_classes))
@@ -246,6 +250,8 @@ def format_metrics_table(metrics: dict[str, Any], method_name: str = "Method") -
     lines.append("|---|---|")
 
     for dim, dim_metrics in metrics.items():
+        if not isinstance(dim_metrics, dict):
+            continue
         if dim == "decision":
             lines.append(f"| Decision Accuracy | {dim_metrics['accuracy']:.4f} |")
             lines.append(f"| Decision F1 (macro) | {dim_metrics['f1_macro']:.4f} |")

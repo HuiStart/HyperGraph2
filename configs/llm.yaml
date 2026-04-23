@@ -16,7 +16,7 @@ ollama:
       # 本地8GB显存配置
       context_window: 32000
     cloud_default:
-      name: "deepseek-r1:14b"
+      name: "deepseek-r1:14b-16k"
       temperature: 0.4
       top_p: 0.95
       max_tokens: 35000

@@ -39,7 +39,8 @@ def parse_review_sections(text: str, level: str = "##") -> dict[str, str]:
         return sections
 
     # Split by section headers
-    pattern = rf'{level}\s+([A-Za-z\s]+):\s*\n'
+    # Support both "## Summary:" and "### Summary" formats
+    pattern = rf'{level}\s+([A-Za-z\s]+):?\s*\n'
     parts = re.split(pattern, text)
 
     # parts[0] is text before first header, then alternating name, content
@@ -96,7 +97,7 @@ def parse_boxed_review(text: str) -> dict[str, Any]:
                 result[key] = sections[key]
 
         # Extract rating number
-        rating_text = sections.get("Rating", "")
+        rating_text = sections.get("rating", "")
         if rating_text:
             result["rating"] = extract_number_from_text(rating_text)
 
@@ -156,7 +157,7 @@ def parse_boxed_simreviewers(text: str) -> list[dict[str, Any]]:
             elif key in sections:
                 review[key] = sections[key]
 
-        rating_text = sections.get("Rating", "")
+        rating_text = sections.get("rating", "")
         if rating_text:
             review["rating"] = extract_number_from_text(rating_text)
 
