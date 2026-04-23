@@ -3,7 +3,10 @@
 
 dataset:
   name: "deepreview"
-  raw_path: "data/raw/sample.json"
+  # CSV dataset location (auto-detected by adapter)
+  raw_path: "data/deepreview/test_2024.csv"
+  # For merged 2024+2025, create a combined CSV first
+  # raw_path: "data/deepreview/test_all.csv"
   processed_path: "data/processed/deepreview_processed.json"
   splits_path: "data/splits"
   # DeepReview 每条样本包含4个人类评审，取均值作为ground truth
