@@ -212,7 +212,10 @@ def get_average_scores(reviews: list[dict[str, Any]]) -> dict[str, float | None]
         for dim in scores:
             val = review.get(dim)
             if val is not None:
-                scores[dim].append(float(val))
+                try:
+                    scores[dim].append(float(val))
+                except (ValueError, TypeError):
+                    continue
 
     return {
         dim: sum(vals) / len(vals) if vals else None
