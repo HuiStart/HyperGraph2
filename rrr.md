@@ -35,3 +35,25 @@ Final Metrics
 
 
 如果你跑的 predictions 文件 pred 列还全是 `-`，把那条命令的输出贴给我，我帮你定位是 LLM 没调通还是 parser 问题。
+
+python -c "
+import json, sys
+sys.path.insert(0, '.')
+from src.scoring.baseline import BestModeScorer
+from src.utils.llm_wrapper import LLMWrapper
+
+llm = LLMWrapper('configs/llm.yaml')
+llm.set_model('cloud_default')
+scorer = BestModeScorer(llm)
+
+with open('data/processed/test_2024_processed.json', 'r', encoding='utf-8') as f:
+    samples = json.load(f)
+
+result = scorer.score(samples[0]['paper_context'], samples[0]['title'])
+print('=== RAW OUTPUT (first 3000 chars) ===')
+print(result['raw_output'][:3000])
+print()
+print('=== PARSED ===')
+import json
+print(json.dumps(result['parsed'], indent=2, ensure_ascii=False)[:1500])
+"
