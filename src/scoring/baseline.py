@@ -108,11 +108,23 @@ class FastModeScorer(BaseScorer):
         parsed = parse_deepreviewer_output(raw_output)
         meta = parsed.get("meta_review", {})
 
+        # Fallback: if boxed_review is missing dimensions, try extracting from raw text
+        soundness = self._extract_number(meta.get("soundness"))
+        presentation = self._extract_number(meta.get("presentation"))
+        contribution = self._extract_number(meta.get("contribution"))
+
+        if soundness is None:
+            soundness = self._extract_from_raw(raw_output, "soundness")
+        if presentation is None:
+            presentation = self._extract_from_raw(raw_output, "presentation")
+        if contribution is None:
+            contribution = self._extract_from_raw(raw_output, "contribution")
+
         scores = {
             "rating": meta.get("rating"),
-            "soundness": self._extract_number(meta.get("soundness")),
-            "presentation": self._extract_number(meta.get("presentation")),
-            "contribution": self._extract_number(meta.get("contribution")),
+            "soundness": soundness,
+            "presentation": presentation,
+            "contribution": contribution,
             "decision": parsed.get("decision", "reject"),
         }
 
@@ -122,6 +134,23 @@ class FastModeScorer(BaseScorer):
             "parsed": parsed,
             "scores": scores,
         }
+
+    @staticmethod
+    def _extract_from_raw(text: str, dimension: str) -> float | None:
+        """Extract score for a dimension from raw text when boxed_review misses it."""
+        if not text:
+            return None
+        # Look for patterns like "## Soundness: 3" or "Soundness: 3 good" or "**Soundness**: 3"
+        patterns = [
+            rf'##\s*{dimension.capitalize()}[:\s]+(\d+(?:\.\d+)?)',
+            rf'\*\*\s*{dimension.capitalize()}\s*\*\*[:\s]+(\d+(?:\.\d+)?)',
+            rf'{dimension.capitalize()}[:\s]+(\d+(?:\.\d+)?)',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return float(match.group(1))
+        return None
 
     @staticmethod
     def _build_user_prompt(paper_context: str, title: str) -> str:
