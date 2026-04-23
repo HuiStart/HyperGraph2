@@ -328,3 +328,44 @@ python scripts/evaluate_predictions.py \
 | **断点续跑** | 代码每 5 条自动保存，但中断后会从头开始。如需断点续跑告诉我，我帮你写 |
 
 需要我帮你写**断点续跑脚本**或者**多进程并行加速**吗？652 条串行跑太慢了。
+
+
+
+## 1. Soundness/Presentation/Contribution 为 null 的原因
+
+LLM 输出的 `\boxed_review{}` 里有时候只写了 Rating 和 Decision，漏了其他维度。原来的代码只从 boxed 块里提取，缺了就变成 null。
+
+**已修复**：`src/scoring/baseline.py` 的 `FastModeScorer` 现在增加了 fallback，如果 boxed 块里找不到，会从 raw text 的其他位置再搜一遍。
+
+
+
+```python
+# 改进后的逻辑
+soundness = self._extract_number(meta.get("soundness"))
+if soundness is None:
+    soundness = self._extract_from_raw(raw_output, "soundness")
+```
+
+**需要重新跑 baseline 才能生效**（之前的输出文件里的 null 不会自动修复）：
+
+
+
+```bash
+python scripts/run_baseline.py \
+    --mode fast \
+    --input data/processed/test_2024_processed.json \
+    --output experiments/baseline_fast_2024_v2.json \
+    --llm-config configs/llm.yaml
+```
+
+## 2. 生成 true/pred 对比表格
+
+新增脚本 `scripts/generate_comparison_table.py`，输出你截图里的那种 markdown 表格：
+
+```bash
+python scripts/generate_comparison_table.py \
+    --ground-truth data/processed/test_2024_processed.json \
+    --predictions experiments/baseline_fast_2024_v2.json \
+    --output results_table.md \
+    --max-samples 20
+```
