@@ -31,8 +31,8 @@ class LLMWrapper:
         if self.provider == "ollama":
             self.ollama_config = self.config.get("ollama", {})
             self.base_url = self.ollama_config.get("base_url", "http://localhost:11434")
-            # Default to local model
-            model_cfg = self.ollama_config.get("models", {}).get("local_default", {})
+            # Default to cloud model
+            model_cfg = self.ollama_config.get("models", {}).get("cloud_default", {})
             self.model_name = model_cfg.get("name", "qwen3.5:4b")
             self.temperature = model_cfg.get("temperature", 0.4)
             self.top_p = model_cfg.get("top_p", 0.95)
