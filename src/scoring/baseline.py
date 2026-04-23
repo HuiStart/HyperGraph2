@@ -1,0 +1,443 @@
+"""
+Baseline scoring implementations aligned with DeepReviewer official modes.
+
+Baseline 1: Fast Mode - pure LLM end-to-end scoring
+Baseline 2: Standard Mode - multi-reviewer simulation + self-verification
+Baseline 3: Best Mode - retrieval-enhanced scoring (with local fallback)
+
+Reference:
+- Research/ai_researcher/deep_reviewer.py
+- Research/ai_researcher/cycle_reviewer.py
+"""
+
+import json
+import re
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any
+
+from src.scoring.aggregation import aggregate_reviews
+from src.utils.llm_wrapper import LLMWrapper
+from src.utils.logger import get_logger
+from src.utils.parser import parse_deepreviewer_output
+
+logger = get_logger(__name__)
+
+
+class BaseScorer(ABC):
+    """Abstract base class for all scorers."""
+
+    def __init__(self, llm: LLMWrapper | None = None):
+        self.llm = llm or LLMWrapper()
+
+    @abstractmethod
+    def score(self, paper_context: str, title: str = "") -> dict[str, Any]:
+        """Score a single paper and return structured results."""
+        pass
+
+    def score_batch(
+        self,
+        samples: list[dict[str, Any]],
+        output_path: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Score a batch of papers.
+
+        Args:
+            samples: List of samples with 'paper_context' and 'title'.
+            output_path: Optional path to save incremental results.
+
+        Returns:
+            List of results dicts.
+        """
+        results = []
+        for i, sample in enumerate(samples):
+            logger.info(f"Scoring sample {i + 1}/{len(samples)}: {sample.get('id', 'unknown')}")
+            try:
+                result = self.score(
+                    paper_context=sample.get("paper_context", ""),
+                    title=sample.get("title", ""),
+                )
+                result["sample_id"] = sample.get("id", "")
+                results.append(result)
+
+                # Incremental save
+                if output_path and (i + 1) % 5 == 0:
+                    self._save_results(results, output_path)
+
+            except Exception as e:
+                logger.error(f"Failed to score sample {sample.get('id')}: {e}")
+                results.append({
+                    "sample_id": sample.get("id", ""),
+                    "error": str(e),
+                    "scores": {},
+                })
+
+        if output_path:
+            self._save_results(results, output_path)
+
+        return results
+
+    @staticmethod
+    def _save_results(results: list[dict[str, Any]], path: str) -> None:
+        out_path = Path(path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+
+
+class FastModeScorer(BaseScorer):
+    """Baseline 1: Pure LLM end-to-end scoring (Fast Mode).
+
+    Aligns with DeepReviewer Fast Mode:
+    - Single direct review output
+    - \boxed_review{} format
+    - Sections: Summary, Soundness, Presentation, Contribution, Strengths,
+                Weaknesses, Suggestions, Questions, Rating, Confidence, Decision
+    """
+
+    def score(self, paper_context: str, title: str = "") -> dict[str, Any]:
+        system_prompt = self.llm.get_scoring_prompt(mode="fast")
+        user_prompt = self._build_user_prompt(paper_context, title)
+
+        raw_output = self.llm.generate(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            max_tokens=7000,
+        )
+
+        parsed = parse_deepreviewer_output(raw_output)
+        meta = parsed.get("meta_review", {})
+
+        scores = {
+            "rating": meta.get("rating"),
+            "soundness": self._extract_number(meta.get("soundness")),
+            "presentation": self._extract_number(meta.get("presentation")),
+            "contribution": self._extract_number(meta.get("contribution")),
+            "decision": parsed.get("decision", "reject"),
+        }
+
+        return {
+            "mode": "fast",
+            "raw_output": raw_output,
+            "parsed": parsed,
+            "scores": scores,
+        }
+
+    @staticmethod
+    def _build_user_prompt(paper_context: str, title: str) -> str:
+        header = f"Title: {title}\n\n" if title else ""
+        return f"{header}Please review the following research paper:\n\n{paper_context}"
+
+    @staticmethod
+    def _extract_number(text: str | None) -> float | None:
+        if not text:
+            return None
+        match = re.search(r'(\d+(?:\.\d+)?)', str(text))
+        return float(match.group(1)) if match else None
+
+
+class StandardModeScorer(BaseScorer):
+    """Baseline 2: Multi-reviewer simulation (Standard Mode).
+
+    Aligns with DeepReviewer Standard Mode:
+    - Simulate N different reviewers
+    - Self-verification to double-check deficiencies
+    - \boxed_review{} + \boxed_simreviewers{} format
+    - Average scores across simulated reviewers
+    """
+
+    def __init__(self, llm: LLMWrapper | None = None, reviewer_num: int = 4):
+        super().__init__(llm)
+        self.reviewer_num = reviewer_num
+
+    def score(self, paper_context: str, title: str = "") -> dict[str, Any]:
+        system_prompt = self.llm.get_scoring_prompt(
+            mode="standard", reviewer_num=self.reviewer_num
+        )
+        user_prompt = self._build_user_prompt(paper_context, title)
+
+        raw_output = self.llm.generate(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            max_tokens=35000,
+        )
+
+        parsed = parse_deepreviewer_output(raw_output)
+        sim_reviews = parsed.get("simulated_reviews", [])
+
+        if sim_reviews:
+            aggregated = aggregate_reviews(sim_reviews, method="mean")
+        else:
+            # Fallback to meta review
+            meta = parsed.get("meta_review", {})
+            aggregated = {
+                "rating": meta.get("rating"),
+                "soundness": self._extract_number(meta.get("soundness")),
+                "presentation": self._extract_number(meta.get("presentation")),
+                "contribution": self._extract_number(meta.get("contribution")),
+                "decision": parsed.get("decision", "reject"),
+            }
+
+        return {
+            "mode": "standard",
+            "raw_output": raw_output,
+            "parsed": parsed,
+            "scores": aggregated,
+            "num_simulated_reviewers": len(sim_reviews),
+        }
+
+    @staticmethod
+    def _build_user_prompt(paper_context: str, title: str) -> str:
+        header = f"Title: {title}\n\n" if title else ""
+        return f"{header}Please review the following research paper. Simulate multiple reviewers and verify your assessment:\n\n{paper_context}"
+
+    @staticmethod
+    def _extract_number(text: str | None) -> float | None:
+        if not text:
+            return None
+        match = re.search(r'(\d+(?:\.\d+)?)', str(text))
+        return float(match.group(1)) if match else None
+
+
+class BestModeScorer(BaseScorer):
+    """Baseline 3: Retrieval-enhanced scoring (Best Mode).
+
+    Aligns with DeepReviewer Best Mode:
+    1. LLM proposes 3 background knowledge questions
+    2. Retrieve answers (OpenScholar API or local fallback)
+    3. Feed retrieved info back to LLM
+    4. Generate final review with simulated reviewers
+
+    Note: If OpenScholar is unavailable, uses local fallback (LLM self-answer).
+    """
+
+    def __init__(
+        self,
+        llm: LLMWrapper | None = None,
+        reviewer_num: int = 4,
+        use_openscholar: bool = False,
+        openscholar_url: str = "http://127.0.0.1:38015/batch_ask",
+    ):
+        super().__init__(llm)
+        self.reviewer_num = reviewer_num
+        self.use_openscholar = use_openscholar
+        self.openscholar_url = openscholar_url
+
+    def score(self, paper_context: str, title: str = "") -> dict[str, Any]:
+        # Step 1: Generate initial review + questions
+        step1_prompt = self._build_step1_prompt(paper_context, title)
+        system_prompt = self.llm.get_scoring_prompt(
+            mode="best", reviewer_num=self.reviewer_num
+        )
+
+        step1_output = self.llm.generate(
+            prompt=step1_prompt,
+            system_prompt=system_prompt,
+            max_tokens=35000,
+        )
+
+        # Step 2: Extract questions
+        questions = self._extract_questions(step1_output)
+        logger.info(f"Extracted {len(questions)} questions for retrieval")
+
+        # Step 3: Retrieve information
+        if questions:
+            retrieved = self._retrieve_information(questions)
+        else:
+            retrieved = []
+
+        # Step 4: Generate final review with retrieved info
+        step2_prompt = self._build_step2_prompt(
+            paper_context, title, step1_output, questions, retrieved
+        )
+
+        final_output = self.llm.generate(
+            prompt=step2_prompt,
+            system_prompt=system_prompt,
+            max_tokens=35000,
+        )
+
+        parsed = parse_deepreviewer_output(final_output)
+        sim_reviews = parsed.get("simulated_reviews", [])
+
+        if sim_reviews:
+            aggregated = aggregate_reviews(sim_reviews, method="mean")
+        else:
+            meta = parsed.get("meta_review", {})
+            aggregated = {
+                "rating": meta.get("rating"),
+                "soundness": self._extract_number(meta.get("soundness")),
+                "presentation": self._extract_number(meta.get("presentation")),
+                "contribution": self._extract_number(meta.get("contribution")),
+                "decision": parsed.get("decision", "reject"),
+            }
+
+        return {
+            "mode": "best",
+            "raw_output": final_output,
+            "step1_output": step1_output,
+            "questions": questions,
+            "retrieved": retrieved,
+            "parsed": parsed,
+            "scores": aggregated,
+        }
+
+    def _build_step1_prompt(self, paper_context: str, title: str) -> str:
+        header = f"Title: {title}\n\n" if title else ""
+        return (
+            f"{header}Please review the following research paper. "
+            f"First, provide three specific background knowledge questions that would help you evaluate this paper more accurately. "
+            f"Then provide a preliminary review.\n\n"
+            f"{paper_context}\n\n"
+            f"Format your questions clearly, one per line."
+        )
+
+    def _build_step2_prompt(
+        self,
+        paper_context: str,
+        title: str,
+        step1_output: str,
+        questions: list[str],
+        retrieved: list[dict[str, Any]],
+    ) -> str:
+        header = f"Title: {title}\n\n" if title else ""
+        qa_text = "\n\n".join(
+            f"Question {i + 1}: {q}\nAnswer: {retrieved[i].get('answer', 'No answer available.') if i < len(retrieved) else 'No answer available.'}"
+            for i, q in enumerate(questions)
+        )
+
+        return (
+            f"{header}Here is a research paper and some background information:\n\n"
+            f"## Paper:\n{paper_context}\n\n"
+            f"## Your preliminary thoughts:\n{step1_output}\n\n"
+            f"## Retrieved information:\n{qa_text}\n\n"
+            f"Now, please provide the final comprehensive review by simulating {self.reviewer_num} different reviewers. "
+            f"Use self-verification to double-check any paper deficiencies identified."
+        )
+
+    @staticmethod
+    def _extract_questions(text: str) -> list[str]:
+        """Extract questions from LLM output."""
+        questions = []
+
+        # Try boxed_questions format
+        boxed_match = re.search(r'\\boxed_questions\{(.*?)\}', text, re.DOTALL)
+        if boxed_match:
+            lines = [l.strip() for l in boxed_match.group(1).split('\n') if l.strip()]
+            for line in lines:
+                cleaned = re.sub(r'^\d+\.\s*', '', line).strip()
+                if cleaned and cleaned != '}':
+                    questions.append(cleaned)
+            return questions
+
+        # Fallback: look for lines ending with ? or starting with numbers
+        for line in text.split('\n'):
+            line = line.strip()
+            if line.endswith('?') or 'question' in line.lower():
+                cleaned = re.sub(r'^\d+\.\s*[-\*]?\s*', '', line).strip()
+                if cleaned and len(cleaned) > 10:
+                    questions.append(cleaned)
+
+        # Deduplicate
+        return list(dict.fromkeys(questions))[:3]
+
+    def _retrieve_information(self, questions: list[str]) -> list[dict[str, Any]]:
+        """Retrieve information for questions."""
+        if not questions:
+            return []
+
+        if self.use_openscholar:
+            return self._retrieve_openscholar(questions)
+        else:
+            # Local fallback: use LLM to self-answer
+            return self._retrieve_local(questions)
+
+    def _retrieve_openscholar(self, questions: list[str]) -> list[dict[str, Any]]:
+        """Call OpenScholar API."""
+        import requests
+
+        try:
+            response = requests.post(
+                self.openscholar_url,
+                json={"questions": questions},
+                timeout=600,
+            )
+            if response.status_code == 200:
+                results = response.json().get("results", [])
+                return [
+                    {
+                        "question": questions[i] if i < len(questions) else "",
+                        "answer": r.get("output", ""),
+                        "passages": r.get("final_passages", ""),
+                    }
+                    for i, r in enumerate(results)
+                ]
+        except Exception as e:
+            logger.warning(f"OpenScholar retrieval failed: {e}. Falling back to local.")
+
+        return self._retrieve_local(questions)
+
+    def _retrieve_local(self, questions: list[str]) -> list[dict[str, Any]]:
+        """Local fallback: ask LLM to answer based on its knowledge."""
+        results = []
+        for question in questions:
+            prompt = f"Please answer this research question based on your knowledge:\n\n{question}\n\nProvide a concise, factual answer."
+            try:
+                answer = self.llm.generate(prompt, max_tokens=1000)
+                results.append({
+                    "question": question,
+                    "answer": answer,
+                    "passages": "",
+                    "source": "local_llm_fallback",
+                })
+            except Exception as e:
+                logger.warning(f"Local retrieval failed for question: {e}")
+                results.append({
+                    "question": question,
+                    "answer": "Retrieval failed.",
+                    "passages": "",
+                    "source": "failed",
+                })
+        return results
+
+    @staticmethod
+    def _extract_number(text: str | None) -> float | None:
+        if not text:
+            return None
+        match = re.search(r'(\d+(?:\.\d+)?)', str(text))
+        return float(match.group(1)) if match else None
+
+
+def run_baseline(
+    samples: list[dict[str, Any]],
+    mode: str = "fast",
+    output_path: str = "experiments/deepreview_baseline/baseline_results.json",
+    llm_config: str = "configs/llm.yaml",
+) -> list[dict[str, Any]]:
+    """Run a baseline scorer on samples.
+
+    Args:
+        samples: List of samples to score.
+        mode: 'fast', 'standard', or 'best'.
+        output_path: Path to save results.
+        llm_config: Path to LLM config.
+
+    Returns:
+        List of scoring results.
+    """
+    llm = LLMWrapper(llm_config)
+
+    if mode == "fast":
+        scorer = FastModeScorer(llm)
+    elif mode == "standard":
+        scorer = StandardModeScorer(llm, reviewer_num=4)
+    elif mode == "best":
+        scorer = BestModeScorer(llm, reviewer_num=4, use_openscholar=False)
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
+
+    logger.info(f"Running Baseline ({mode} mode) on {len(samples)} samples...")
+    results = scorer.score_batch(samples, output_path=output_path)
+    logger.info(f"Results saved to {output_path}")
+
+    return results

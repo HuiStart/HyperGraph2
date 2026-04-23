@@ -1,0 +1,102 @@
+# DeepReview 数据集专用配置
+# 与官方实现对齐，评分维度固定为4个
+
+dataset:
+  name: "deepreview"
+  raw_path: "data/raw/sample.json"
+  processed_path: "data/processed/deepreview_processed.json"
+  splits_path: "data/splits"
+  # DeepReview 每条样本包含4个人类评审，取均值作为ground truth
+  num_human_reviewers: 4
+
+# 评分维度配置（与官方 evalate.py 对齐）
+dimensions:
+  - name: "Rating"
+    description: "Overall assessment score (1-10)"
+    scale: [1, 10]
+    key: "rating"
+  - name: "Soundness"
+    description: "Assess methodology and logical consistency (1-5)"
+    scale: [1, 5]
+    key: "soundness"
+  - name: "Presentation"
+    description: "Evaluate clarity, organization, and visual aids (1-5)"
+    scale: [1, 5]
+    key: "presentation"
+  - name: "Contribution"
+    description: "Analyze significance and novelty in the field (1-5)"
+    scale: [1, 5]
+    key: "contribution"
+
+# 决策配置
+decision:
+  values: ["accept", "reject"]
+  threshold: 5  # rating >= 5 视为可接受（与官方逻辑对齐：decision字段直接使用）
+
+# 评估指标配置（与官方 evalate.py 完全一致）
+evaluation:
+  primary_metrics:
+    - "mse"
+    - "mae"
+    - "spearman"
+    - "decision_accuracy"
+    - "decision_f1_macro"
+    - "pairwise_accuracy"
+  # 扩展指标（非必须，用于对比）
+  extended_metrics:
+    - "rmse"
+    - "pearson"
+    - "qwk"
+  #  pairwise 评估维度
+  pairwise_dimensions:
+    - "rating"
+    - "soundness"
+    - "presentation"
+    - "contribution"
+
+# 输出格式配置（与官方 deep_reviewer.py 对齐）
+output_format:
+  fast_mode:
+    wrapper: "boxed_review"
+    sections:
+      - "Summary"
+      - "Soundness"
+      - "Presentation"
+      - "Contribution"
+      - "Strengths"
+      - "Weaknesses"
+      - "Suggestions"
+      - "Questions"
+      - "Rating"
+      - "Confidence"
+      - "Decision"
+  standard_mode:
+    wrapper: ["boxed_review", "boxed_simreviewers"]
+    num_reviewers: 4
+    sections:
+      - "Summary"
+      - "Soundness"
+      - "Presentation"
+      - "Contribution"
+      - "Strengths"
+      - "Weaknesses"
+      - "Suggestions"
+      - "Questions"
+      - "Rating"
+      - "Confidence"
+
+# 证据抽取配置
+evidence:
+  types:
+    - "claim_evidence"      # 核心论点（abstract/intro/conclusion）
+    - "method_evidence"     # 方法论（methods章节）
+    - "experiment_evidence" # 实验结果（results章节）
+    - "reference_evidence"  # 引用信息（related work）
+    - "consistency_evidence" # 跨章节一致性
+
+# 风险控制阈值
+risk:
+  score_std_threshold: 1.5       # 多agent评分标准差超过此值则升级
+  confidence_threshold: 2        # confidence低于此值则升级（1-5分制）
+  min_evidence_count: 3          # 最少证据数量
+  consistency_conflict_threshold: 1  # 一致性冲突数量超过此值则升级
