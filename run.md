@@ -146,3 +146,185 @@ ls experiments/
 ```
 
 如果需要我把运行脚本改成后台批处理形式（nohup + 日志重定向），或者添加多进程并行加速，请告诉我。
+
+
+
+
+
+
+
+## 已完成的代码修改
+
+1. **`src/adapters/deepreview_adapter.py`**：支持 CSV 自动识别，提取 `inputs` 里的论文全文和 `rating`/`decision` 作为 ground truth
+2. **`src/utils/parser.py`**：修复评分解析时的 float 转换容错
+3. **`scripts/evaluate_predictions.py`**：新增，用于对比"LLM 新生成的预测"与 ground truth
+
+------
+
+## 服务器完整运行流程
+
+### 前置准备
+
+
+
+```bash
+cd d:/Experiment/HyperGraph2
+
+# 1. 确保 ollama 已启动
+ollama serve
+
+# 2. 拉取模型（双卡16GB用 deepseek-r1:14b-16k）
+ollama pull deepseek-r1:14b-16k
+
+# 3. 建议开 tmux，防止 SSH 断开
+tmux new -s deepreview
+```
+
+### 修改模型配置（`configs/llm.yaml`）
+
+
+
+```yaml
+ollama:
+  base_url: "http://localhost:11434"
+  models:
+    cloud_default:
+      name: "deepseek-r1:14b-16k"
+      temperature: 0.4
+      max_tokens: 35000
+      context_window: 16384
+```
+
+### Step 1: 预处理 CSV → JSON
+
+提取论文内容和 ground truth，保存为统一格式：
+
+
+
+```bash
+# 2024 数据（652条）
+python -m src.cli.main preprocess \
+    --input data/deepreview/test_2024.csv \
+    --output data/processed/test_2024_processed.json
+
+# 2025 数据（634条）
+python -m src.cli.main preprocess \
+    --input data/deepreview/test_2025.csv \
+    --output data/processed/test_2025_processed.json
+```
+
+### Step 2: 运行 Baseline（调用 LLM 生成预测）
+
+**Fast Mode**（单审稿人，较快）：
+
+
+
+```bash
+python scripts/run_baseline.py \
+    --mode fast \
+    --input data/processed/test_2024_processed.json \
+    --output experiments/baseline_fast_2024.json \
+    --llm-config configs/llm.yaml
+```
+
+**Standard Mode**（4个模拟审稿人，慢）：
+
+
+
+```bash
+python scripts/run_baseline.py \
+    --mode standard \
+    --input data/processed/test_2024_processed.json \
+    --output experiments/baseline_standard_2024.json \
+    --llm-config configs/llm.yaml
+```
+
+**Best Mode**（检索增强，最慢）：
+
+
+
+```bash
+python scripts/run_baseline.py \
+    --mode best \
+    --input data/processed/test_2024_processed.json \
+    --output experiments/baseline_best_2024.json \
+    --llm-config configs/llm.yaml
+```
+
+### Step 3: 运行 Our Method（多 Agent 增强方法）
+
+
+
+```bash
+python scripts/run_ours.py \
+    --input data/processed/test_2024_processed.json \
+    --output experiments/ours_2024.json \
+    --llm-config configs/llm.yaml
+```
+
+### Step 4: 评估（对比 Ground Truth）
+
+
+
+```bash
+# 评估 Fast Mode
+python scripts/evaluate_predictions.py \
+    --ground-truth data/processed/test_2024_processed.json \
+    --predictions experiments/baseline_fast_2024.json \
+    --output experiments/metrics_fast_2024.json
+
+# 评估 Standard Mode
+python scripts/evaluate_predictions.py \
+    --ground-truth data/processed/test_2024_processed.json \
+    --predictions experiments/baseline_standard_2024.json \
+    --output experiments/metrics_standard_2024.json
+
+# 评估 Our Method
+python scripts/evaluate_predictions.py \
+    --ground-truth data/processed/test_2024_processed.json \
+    --predictions experiments/ours_2024.json \
+    --output experiments/metrics_ours_2024.json
+```
+
+------
+
+## 快速测试（先跑 5 条验证）
+
+在跑完整数据集前，强烈建议先测试 5 条：
+
+
+
+```bash
+# 预处理 5 条
+python -m src.cli.main preprocess \
+    --input data/deepreview/test_2024.csv \
+    --output data/processed/test_5.json \
+    --max-samples 5
+
+# Fast Mode 测试
+python scripts/run_baseline.py \
+    --mode fast \
+    --input data/processed/test_5.json \
+    --output experiments/test_5_fast.json \
+    --llm-config configs/llm.yaml
+
+# 评估测试
+python scripts/evaluate_predictions.py \
+    --ground-truth data/processed/test_5.json \
+    --predictions experiments/test_5_fast.json
+```
+
+确认输出正常、模型响应可解析后，再去掉 `--max-samples` 跑全量。
+
+------
+
+## 关键提醒
+
+| 问题         | 方案                                                         |
+| ------------ | ------------------------------------------------------------ |
+| **运行时间** | 652 条 × Fast Mode 约 15-30 小时，Standard/Best 可能数倍。务必用 tmux/screen |
+| **显存**     | `deepseek-r1:14b-16k` 双卡 16GB 应该够用。如 OOM 换 `qwen3.5:4b` |
+| **超时**     | `src/utils/llm_wrapper.py` 默认 timeout=300，Standard/Best 输出很长，建议改 600+ |
+| **断点续跑** | 代码每 5 条自动保存，但中断后会从头开始。如需断点续跑告诉我，我帮你写 |
+
+需要我帮你写**断点续跑脚本**或者**多进程并行加速**吗？652 条串行跑太慢了。
