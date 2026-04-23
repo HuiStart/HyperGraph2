@@ -12,12 +12,15 @@ Key mappings:
 - Ground truth = mean across all human reviewers per dimension
 """
 
+import ast
+import csv
 import json
 import re
 from pathlib import Path
 from typing import Any
 
 from src.utils.logger import get_logger
+from src.utils.parser import get_average_scores, parse_deepreviewer_output
 
 logger = get_logger(__name__)
 
@@ -146,8 +149,10 @@ def load_and_adapt(raw_path: str, output_path: str | None = None,
                    max_samples: int | None = None) -> list[dict[str, Any]]:
     """Load DeepReview raw data, adapt to unified format, optionally save.
 
+    Auto-detects file format (.json or .csv).
+
     Args:
-        raw_path: Path to raw sample.json.
+        raw_path: Path to raw data (sample.json or test_2024.csv).
         output_path: Optional path to save processed data.
         max_samples: Optional limit on number of samples to process.
 
@@ -155,7 +160,11 @@ def load_and_adapt(raw_path: str, output_path: str | None = None,
         List of unified samples.
     """
     raw_path = Path(raw_path)
-    logger.info(f"Loading DeepReview data from {raw_path}")
+
+    if raw_path.suffix.lower() == ".csv":
+        return load_csv_and_adapt(str(raw_path), output_path, max_samples)
+
+    logger.info(f"Loading DeepReview JSON from {raw_path}")
 
     with open(raw_path, "r", encoding="utf-8") as f:
         raw_data = json.load(f)
@@ -205,6 +214,123 @@ def get_ground_truth_arrays(data: list[dict[str, Any]]) -> dict[str, list[float]
 def get_decisions(data: list[dict[str, Any]]) -> list[str]:
     """Extract ground truth decisions."""
     return [s["ground_truth"]["decision"] for s in data if s["ground_truth"].get("decision")]
+
+
+def adapt_csv_row(row: dict[str, str]) -> dict[str, Any] | None:
+    """Adapt a single CSV row from DeepReview dataset to unified format.
+
+    CSV columns: inputs, outputs, year, id, mode, rating, decision, reviewer_comments
+    """
+    try:
+        inputs = json.loads(row["inputs"])
+        outputs = json.loads(row["outputs"])
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.warning(f"Failed to parse JSON in row {row.get('id', '')}: {e}")
+        return None
+
+    # Extract paper context from user message (messages[1])
+    paper_context = ""
+    if len(inputs) > 1 and inputs[1].get("role") == "user":
+        paper_context = inputs[1].get("content", "")
+
+    # Extract title from paper context
+    title = ""
+    title_match = re.search(r'\\title\{(.*?)\}', paper_context)
+    if title_match:
+        title = title_match.group(1)
+
+    # Parse ground truth rating list, e.g. "[5, 6, 6, 5]"
+    rating_raw = row.get("rating", "")
+    try:
+        rating_list = ast.literal_eval(rating_raw) if rating_raw else []
+        if not isinstance(rating_list, list):
+            rating_list = []
+    except Exception:
+        rating_list = []
+
+    gt_rating = sum(rating_list) / len(rating_list) if rating_list else None
+
+    # Parse decision
+    decision_raw = row.get("decision", "")
+    gt_decision = "accept" if "accept" in decision_raw.lower() else "reject"
+
+    # Parse predicted scores from outputs (last assistant message)
+    pred_scores = {"rating": None, "soundness": None, "presentation": None, "contribution": None, "decision": "reject"}
+    if outputs and isinstance(outputs, list):
+        last_msg = outputs[-1]
+        if last_msg.get("role") == "assistant":
+            parsed = parse_deepreviewer_output(last_msg.get("content", ""))
+            sim_reviews = parsed.get("simulated_reviews", [])
+            if sim_reviews:
+                avg = get_average_scores(sim_reviews)
+                pred_scores.update(avg)
+            else:
+                meta = parsed.get("meta_review", {})
+                pred_scores["rating"] = meta.get("rating")
+            pred_scores["decision"] = parsed.get("decision", "reject")
+
+    unified = {
+        "id": row.get("id", ""),
+        "title": title,
+        "paper_context": paper_context,
+        "reviews": [],
+        "ground_truth": {
+            "rating": gt_rating,
+            "soundness": None,  # CSV does not have per-dimension human scores
+            "presentation": None,
+            "contribution": None,
+            "decision": gt_decision,
+        },
+        "metadata": {
+            "source": "deepreview_csv",
+            "year": row.get("year", ""),
+            "mode": row.get("mode", ""),
+            "num_human_reviewers": len(rating_list),
+            "reviewer_comments": row.get("reviewer_comments", ""),
+        },
+        "raw_predictions": {
+            "pred_scores": pred_scores,
+        }
+    }
+    return unified
+
+
+def load_csv_and_adapt(raw_path: str, output_path: str | None = None,
+                       max_samples: int | None = None) -> list[dict[str, Any]]:
+    """Load DeepReview CSV data and adapt to unified format."""
+    raw_path = Path(raw_path)
+    logger.info(f"Loading DeepReview CSV from {raw_path}")
+
+    # Increase CSV field size limit for large outputs columns
+    import sys
+    max_int = sys.maxsize
+    while True:
+        try:
+            csv.field_size_limit(max_int)
+            break
+        except OverflowError:
+            max_int = max_int // 10
+
+    unified_data = []
+    with open(raw_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            adapted = adapt_csv_row(row)
+            if adapted:
+                unified_data.append(adapted)
+            if max_samples and len(unified_data) >= max_samples:
+                break
+
+    logger.info(f"Adapted {len(unified_data)} samples from CSV")
+
+    if output_path:
+        out_path = Path(output_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(unified_data, f, ensure_ascii=False, indent=2)
+        logger.info(f"Saved processed data to {out_path}")
+
+    return unified_data
 
 
 if __name__ == "__main__":

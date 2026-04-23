@@ -426,7 +426,8 @@ def run_baseline(
         List of scoring results.
     """
     llm = LLMWrapper(llm_config)
-
+    llm.set_model("cloud_default") 
+    
     if mode == "fast":
         scorer = FastModeScorer(llm)
     elif mode == "standard":
