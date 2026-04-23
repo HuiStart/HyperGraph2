@@ -120,12 +120,41 @@ class FastModeScorer(BaseScorer):
         if contribution is None:
             contribution = self._extract_from_raw(raw_output, "contribution")
 
+        # Strong fallback: if still no rating, ask LLM again with simplified prompt
+        if meta.get("rating") is None:
+            retry_prompt = (
+                f"Based on your review above, please now output ONLY the numerical scores in this exact format:\n\n"
+                f"Soundness: [1-5]\n"
+                f"Presentation: [1-5]\n"
+                f"Contribution: [1-5]\n"
+                f"Rating: [1-10]\n"
+                f"Decision: [Accept or Reject]"
+            )
+            retry_output = self.llm.generate(
+                prompt=retry_prompt,
+                system_prompt=None,
+                max_tokens=500,
+            )
+            raw_output += "\n\n" + retry_output
+            # Parse retry output
+            for dim in ["soundness", "presentation", "contribution", "rating"]:
+                if locals().get(dim) is None or dim == "rating" and scores.get("rating") is None:
+                    m = re.search(rf'{dim.capitalize()}[:\s]+(\d+(?:\.\d+)?)', retry_output, re.IGNORECASE)
+                    if m:
+                        if dim == "rating":
+                            scores["rating"] = float(m.group(1))
+                        else:
+                            locals()[dim] = float(m.group(1))
+            dec_m = re.search(r'Decision[:\s]+(Accept|Reject)', retry_output, re.IGNORECASE)
+            if dec_m:
+                scores["decision"] = dec_m.group(1).lower()
+
         scores = {
-            "rating": meta.get("rating"),
+            "rating": meta.get("rating") if meta.get("rating") is not None else scores.get("rating"),
             "soundness": soundness,
             "presentation": presentation,
             "contribution": contribution,
-            "decision": parsed.get("decision", "reject"),
+            "decision": parsed.get("decision", "reject") if parsed.get("decision") else scores.get("decision", "reject"),
         }
 
         return {
@@ -155,7 +184,24 @@ class FastModeScorer(BaseScorer):
     @staticmethod
     def _build_user_prompt(paper_context: str, title: str) -> str:
         header = f"Title: {title}\n\n" if title else ""
-        return f"{header}Please review the following research paper:\n\n{paper_context}"
+        return (
+            f"{header}Please review the following research paper.\n\n"
+            f"{paper_context}\n\n"
+            f"You MUST output your review in the following exact format. Do not deviate from this format:\n\n"
+            f"\\boxed_review{{\n"
+            f"## Summary:\n[Your summary]\n\n"
+            f"## Soundness:\n[Score 1-5]\n\n"
+            f"## Presentation:\n[Score 1-5]\n\n"
+            f"## Contribution:\n[Score 1-5]\n\n"
+            f"## Strengths:\n[Your strengths]\n\n"
+            f"## Weaknesses:\n[Your weaknesses]\n\n"
+            f"## Suggestions:\n[Your suggestions]\n\n"
+            f"## Questions:\n[Your questions]\n\n"
+            f"## Rating:\n[Overall score 1-10]\n\n"
+            f"## Confidence:\n[Confidence 1-5]\n\n"
+            f"## Decision:\n[Accept or Reject]\n"
+            f"}}"
+        )
 
     @staticmethod
     def _extract_number(text: str | None) -> float | None:
@@ -218,7 +264,21 @@ class StandardModeScorer(BaseScorer):
     @staticmethod
     def _build_user_prompt(paper_context: str, title: str) -> str:
         header = f"Title: {title}\n\n" if title else ""
-        return f"{header}Please review the following research paper. Simulate multiple reviewers and verify your assessment:\n\n{paper_context}"
+        return (
+            f"{header}Please review the following research paper. Simulate multiple reviewers and verify your assessment:\n\n"
+            f"{paper_context}\n\n"
+            f"You MUST wrap all simulated reviewers in the following exact format:\n\n"
+            f"\\boxed_simreviewers{{\n"
+            f"## Reviewer 1\n"
+            f"### Summary:\n...\n"
+            f"### Soundness:\n[Score 1-5]\n"
+            f"### Presentation:\n[Score 1-5]\n"
+            f"### Contribution:\n[Score 1-5]\n"
+            f"### Rating:\n[Score 1-10]\n"
+            f"### Decision:\n[Accept or Reject]\n\n"
+            f"## Reviewer 2\n...\n"
+            f"}}"
+        )
 
     @staticmethod
     def _extract_number(text: str | None) -> float | None:
@@ -341,7 +401,18 @@ class BestModeScorer(BaseScorer):
             f"## Your preliminary thoughts:\n{step1_output}\n\n"
             f"## Retrieved information:\n{qa_text}\n\n"
             f"Now, please provide the final comprehensive review by simulating {self.reviewer_num} different reviewers. "
-            f"Use self-verification to double-check any paper deficiencies identified."
+            f"Use self-verification to double-check any paper deficiencies identified.\n\n"
+            f"You MUST wrap all simulated reviewers in the following exact format:\n\n"
+            f"\\boxed_simreviewers{{\n"
+            f"## Reviewer 1\n"
+            f"### Summary:\n...\n"
+            f"### Soundness:\n[Score 1-5]\n"
+            f"### Presentation:\n[Score 1-5]\n"
+            f"### Contribution:\n[Score 1-5]\n"
+            f"### Rating:\n[Score 1-10]\n"
+            f"### Decision:\n[Accept or Reject]\n\n"
+            f"## Reviewer 2\n...\n"
+            f"}}"
         )
 
     @staticmethod

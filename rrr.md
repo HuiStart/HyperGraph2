@@ -57,3 +57,8 @@ print('=== PARSED ===')
 import json
 print(json.dumps(result['parsed'], indent=2, ensure_ascii=False)[:1500])
 "
+
+python scripts/run_and_evaluate.py \
+    --input data/processed/test_5.json \
+    --mode fast \
+    --max-samples 2
