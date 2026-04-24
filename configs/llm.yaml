@@ -10,7 +10,7 @@ ollama:
   models:
     local_default:
       name: "qwen3.5:4b"
-      temperature: 0.4
+      temperature: 0.1
       top_p: 0.95
       max_tokens: 7000
       # 本地8GB显存配置
