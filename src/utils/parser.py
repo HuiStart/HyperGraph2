@@ -14,13 +14,20 @@ import re
 from typing import Any
 
 
+def round_to_step(value: float | None, step: float = 0.05) -> float | None:
+    """Round value to nearest step (e.g. 0.05)."""
+    if value is None:
+        return None
+    return round(round(value / step) * step, 2)
+
+
 def extract_number_from_text(text: str) -> float | None:
     """Extract the first number from text (e.g. '3 good' -> 3.0)."""
     if not text:
         return None
     match = re.search(r'(\d+(?:\.\d+)?)', str(text))
     if match:
-        return round(float(match.group(1)), 2)
+        return round_to_step(float(match.group(1)))
     return None
 
 
@@ -218,7 +225,7 @@ def get_average_scores(reviews: list[dict[str, Any]]) -> dict[str, float | None]
                     continue
 
     return {
-        dim: sum(vals) / len(vals) if vals else None
+        dim: round_to_step(sum(vals) / len(vals)) if vals else None
         for dim, vals in scores.items()
     }
 

@@ -10,6 +10,7 @@ from typing import Any
 from src.scoring.aggregation import aggregate_scores
 from src.utils.llm_wrapper import LLMWrapper
 from src.utils.logger import get_logger
+from src.utils.parser import round_to_step
 
 logger = get_logger(__name__)
 
@@ -66,16 +67,16 @@ class ArbitrationAgent:
                 )
             else:
                 # Low disagreement, use median to avoid inflation from weighted mean
-                final_scores[dim] = round(float(np.median(score_values)), 2)
+                final_scores[dim] = round_to_step(float(np.median(score_values)))
 
-        # Round all dimension scores to 2 decimals
+        # Round all dimension scores to 0.05 step
         for k in list(final_scores.keys()):
             if isinstance(final_scores[k], float):
-                final_scores[k] = round(final_scores[k], 2)
+                final_scores[k] = round_to_step(final_scores[k])
 
-        # Compute decision from rating (threshold: >= 5 is accept)
+        # Compute decision from rating (threshold: >= 6.5 is accept, aligned with config)
         rating = final_scores.get("rating", 0)
-        final_scores["decision"] = "accept" if rating >= 5 else "reject"
+        final_scores["decision"] = "accept" if rating >= 6.5 else "reject"
 
         return {
             "final_scores": final_scores,

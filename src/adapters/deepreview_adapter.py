@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from src.utils.logger import get_logger
-from src.utils.parser import get_average_scores, parse_deepreviewer_output
+from src.utils.parser import get_average_scores, parse_deepreviewer_output, round_to_step
 
 logger = get_logger(__name__)
 
@@ -39,7 +39,7 @@ def extract_numeric_score(value: Any) -> float | None:
     # Try to match leading number (integer or float)
     match = re.match(r'(\d+(?:\.\d+)?)', text)
     if match:
-        return round(float(match.group(1)), 2)
+        return round_to_step(float(match.group(1)))
 
     return None
 
