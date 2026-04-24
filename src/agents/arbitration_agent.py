@@ -65,13 +65,8 @@ class ArbitrationAgent:
                     f"{dim}: high disagreement (std={std:.2f}), arbitrated to {final_scores[dim]}"
                 )
             else:
-                # Low disagreement, use weighted mean by confidence
-                valid = [(s, c) for s, c in zip(score_values, confidences) if s is not None]
-                if valid:
-                    scores, weights = zip(*valid)
-                    final_scores[dim] = aggregate_scores(list(scores), method="weighted", weights=list(weights))
-                else:
-                    final_scores[dim] = score_values[0]
+                # Low disagreement, use median to avoid inflation from weighted mean
+                final_scores[dim] = round(float(np.median(score_values)), 2)
 
         # Round all dimension scores to 2 decimals
         for k in list(final_scores.keys()):
