@@ -23,9 +23,9 @@ def main():
                         help="Output path for results")
     parser.add_argument("--samples","-n", type=int, default=None,
                         help="Max number of samples to score")
-    parser.add_argument("--llm-config", default="configs/llm.yaml",
+    parser.add_argument("--llm-config","-lc", default="configs/llm.yaml",
                         help="LLM config path")
-    parser.add_argument("--use-llm-evidence", action="store_true",
+    parser.add_argument("--use-llm-evidence", "le",action="store_true",
                         help="Use LLM for evidence extraction")
     args = parser.parse_args()
 
