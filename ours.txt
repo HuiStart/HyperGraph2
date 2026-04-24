@@ -1,0 +1,23 @@
+(/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag) a510@A510-PC:/media/a510/AE8801F58801BD391/yzx/HDM/HyperGraph2$ python scripts/run_ours.py     --input data/processed/test_2024_processed.json     --output experiments/pred_ours.json     --use-llm-evidence     -n 2
+2026-04-24 10:30:47 - src.agents.workflow - INFO - Batch 1/2: w7BwaDHppp
+2026-04-24 10:30:47 - src.agents.workflow - INFO - Workflow: processing sample w7BwaDHppp
+2026-04-24 10:30:47 - src.agents.evidence_agent - INFO - EvidenceAgent: extracting evidence for 'Geometry-Aware Projective Mapping for Unbounded Ne...'
+2026-04-24 10:31:59 - src.utils.llm_wrapper - WARNING - JSON decode failed: Expecting property name enclosed in double quotes: line 61 column 13 (char 3333). Returning raw text wrapper.
+2026-04-24 10:31:59 - src.agents.scoring_agent - INFO - ScoringAgent [soundness]: scoring 'Geometry-Aware Projective Mapping for Unbounded Ne...'
+2026-04-24 10:32:20 - src.agents.scoring_agent - INFO - ScoringAgent [presentation]: scoring 'Geometry-Aware Projective Mapping for Unbounded Ne...'
+2026-04-24 10:32:52 - src.agents.scoring_agent - INFO - ScoringAgent [contribution]: scoring 'Geometry-Aware Projective Mapping for Unbounded Ne...'
+2026-04-24 10:33:15 - src.agents.arbitration_agent - INFO - ArbitrationAgent: arbitrating 3 dimension scores
+2026-04-24 10:33:15 - src.agents.explanation_agent - INFO - ExplanationAgent: generating explanation for 'Geometry-Aware Projective Mapping for Unbounded Ne...'
+2026-04-24 10:33:15 - src.agents.workflow - INFO - Batch 2/2: u4CQHLTfg5
+2026-04-24 10:33:15 - src.agents.workflow - INFO - Workflow: processing sample u4CQHLTfg5
+2026-04-24 10:33:15 - src.agents.evidence_agent - INFO - EvidenceAgent: extracting evidence for 'Individual Fairness as an Extension of Group Fairn...'
+2026-04-24 10:34:37 - src.agents.scoring_agent - INFO - ScoringAgent [soundness]: scoring 'Individual Fairness as an Extension of Group Fairn...'
+2026-04-24 10:35:17 - src.agents.scoring_agent - INFO - ScoringAgent [presentation]: scoring 'Individual Fairness as an Extension of Group Fairn...'
+2026-04-24 10:35:58 - src.agents.scoring_agent - INFO - ScoringAgent [contribution]: scoring 'Individual Fairness as an Extension of Group Fairn...'
+2026-04-24 10:36:31 - src.agents.arbitration_agent - INFO - ArbitrationAgent: arbitrating 3 dimension scores
+2026-04-24 10:36:31 - src.agents.explanation_agent - INFO - ExplanationAgent: generating explanation for 'Individual Fairness as an Extension of Group Fairn...'
+
+Our method completed.
+Results saved to: experiments/pred_ours.json
+Total samples: 2
+Escalated to human: 0

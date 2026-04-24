@@ -2,7 +2,11 @@
 Run our enhanced multi-agent scoring method on DeepReview data.
 
 Usage:
-    python scripts/run_ours.py --samples 10
+    python scripts/run_ours.py \
+        --input data/processed/test_2024_processed.json \
+        --output experiments/pred_ours.json \
+        --use-llm-evidence \
+        -n 5
 """
 
 import argparse
@@ -13,19 +17,29 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.agents.workflow import ReviewWorkflow
+from src.evaluation.metrics import compute_all_metrics, format_metrics_table
+from src.utils.llm_wrapper import LLMWrapper
+
+
+def fmt_val(val, default="-"):
+    if val is None:
+        return default
+    if isinstance(val, float):
+        return f"{val:.2f}"
+    return str(val)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Run our enhanced scoring method")
-    parser.add_argument("--input","-i", default="data/processed/deepreview_processed.json",
+    parser.add_argument("--input", "-i", default="data/processed/deepreview_processed.json",
                         help="Input processed data path")
-    parser.add_argument("--output","-o" ,default="experiments/ours_results.json",
+    parser.add_argument("--output", "-o", default="experiments/ours_results.json",
                         help="Output path for results")
-    parser.add_argument("--samples","-n", type=int, default=None,
+    parser.add_argument("--samples", "-n", type=int, default=None,
                         help="Max number of samples to score")
-    parser.add_argument("--llm-config","-lc", default="configs/llm.yaml",
+    parser.add_argument("--llm-config", "-lc", default="configs/llm.yaml",
                         help="LLM config path")
-    parser.add_argument("--use-llm-evidence", "-le",action="store_true",
+    parser.add_argument("--use-llm-evidence", "-le", action="store_true",
                         help="Use LLM for evidence extraction")
     args = parser.parse_args()
 
@@ -37,20 +51,86 @@ def main():
         samples = samples[:args.samples]
 
     # Initialize workflow
-    from src.utils.llm_wrapper import LLMWrapper
     llm = LLMWrapper(args.llm_config)
     workflow = ReviewWorkflow(llm=llm, use_llm_evidence=args.use_llm_evidence)
 
-    # Run workflow
-    results = workflow.run_batch(samples, output_path=args.output)
+    dimensions = [
+        ("rating", "Rating"),
+        ("soundness", "Soundness"),
+        ("presentation", "Presentation"),
+        ("contribution", "Contribution"),
+    ]
 
-    print(f"\nOur method completed.")
-    print(f"Results saved to: {args.output}")
+    y_true = {d[0]: [] for d in dimensions}
+    y_pred = {d[0]: [] for d in dimensions}
+    decisions_true = []
+    decisions_pred = []
+    results = []
 
-    # Print summary stats
+    print("=" * 110)
+    print(f"{'Sample':<8} {'ID':<15} {'Rating':<12} {'Soundness':<12} {'Presentation':<14} {'Contribution':<14} {'Decision':<16}")
+    print("=" * 110)
+
+    for i, sample in enumerate(samples):
+        sid = sample.get("id", "")
+        gt_scores = sample.get("ground_truth", {})
+
+        result = workflow.run(
+            paper_context=sample["paper_context"],
+            title=sample.get("title", ""),
+            sample_id=sid,
+        )
+        results.append(result)
+        pred_scores = result.get("scores", {})
+
+        # Print comparison row
+        row_vals = [f"{i+1}/{len(samples)}", sid[:12]]
+        for dim_key, dim_name in dimensions:
+            gt_val = gt_scores.get(dim_key)
+            pred_val = pred_scores.get(dim_key)
+            row_vals.append(f"{fmt_val(gt_val)}/{fmt_val(pred_val)}")
+            if gt_val is not None and pred_val is not None:
+                y_true[dim_key].append(float(gt_val))
+                y_pred[dim_key].append(float(pred_val))
+
+        gt_dec = gt_scores.get("decision", "-")
+        pred_dec = pred_scores.get("decision", "-")
+        row_vals.append(f"{gt_dec.capitalize()}/{pred_dec.capitalize()}")
+        decisions_true.append(gt_dec)
+        decisions_pred.append(pred_dec)
+
+        print(f"{row_vals[0]:<8} {row_vals[1]:<15} {row_vals[2]:<12} {row_vals[3]:<12} {row_vals[4]:<14} {row_vals[5]:<14} {row_vals[6]:<16}")
+
+    print("=" * 110)
+
+    # Save predictions
+    out_path = Path(args.output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+    print(f"\nResults saved to: {args.output}")
+
+    # Summary stats
     escalated = sum(1 for r in results if r.get("risk", {}).get("escalate", False))
     print(f"Total samples: {len(results)}")
     print(f"Escalated to human: {escalated}")
+
+    # Final metrics
+    if not y_true["rating"]:
+        print("No valid samples to evaluate.")
+        return
+
+    metrics = compute_all_metrics(
+        y_true=y_true,
+        y_pred=y_pred,
+        y_true_decisions=decisions_true,
+        y_pred_decisions=decisions_pred,
+    )
+
+    print("\n" + "=" * 60)
+    print("Final Metrics")
+    print("=" * 60)
+    print(format_metrics_table(metrics))
 
 
 if __name__ == "__main__":
