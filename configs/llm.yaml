@@ -17,8 +17,8 @@ ollama:
       context_window: 32000
     cloud_default:
       name: "deepseek-r1:32b-16k"
-      temperature: 0.1
-      top_p: 0.95
+      temperature: 0.0
+      top_p: 0.8
       max_tokens: 35000
       # 云服务器双卡16GB配置
       context_window: 16384

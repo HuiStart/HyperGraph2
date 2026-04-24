@@ -44,11 +44,10 @@ class ReviewWorkflow:
         self.risk_agent = RiskAgent()
         self.consistency_checker = ConsistencyChecker()
 
-        # Scoring agents per dimension
+        # Scoring agents per dimension (including rating for direct scoring)
         self.scoring_agents = {
             dim["key"]: DimensionScoringAgent(dim["key"], self.llm)
             for dim in self.rubric.get_all_dimensions()
-            if dim["key"] != "rating"  # Rating is computed from dimensions
         }
 
     def run(self, paper_context: str, title: str = "", sample_id: str = "") -> dict[str, Any]:

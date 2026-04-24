@@ -73,21 +73,10 @@ class ArbitrationAgent:
                 else:
                     final_scores[dim] = score_values[0]
 
-        # Compute overall rating from dimension scores (heuristic)
-        dim_avg = []
-        for dim in ["soundness", "presentation", "contribution"]:
-            if dim in final_scores and final_scores[dim] is not None:
-                dim_avg.append(final_scores[dim])
-
         # Round all dimension scores to 2 decimals
         for k in list(final_scores.keys()):
             if isinstance(final_scores[k], float):
                 final_scores[k] = round(final_scores[k], 2)
-
-        if dim_avg:
-            # Scale to 1-10: average of 1-4 dimensions, doubled
-            raw_avg = sum(dim_avg) / len(dim_avg)
-            final_scores["rating"] = round(min(10.0, raw_avg * 2), 2)
 
         # Compute decision from rating (threshold: >= 5 is accept)
         rating = final_scores.get("rating", 0)

@@ -104,8 +104,9 @@ class DimensionScoringAgent:
 
         lines.append(
             f"\nBased on the evidence and paper, provide a {self.dimension} score "
-            f"({dim_info['scale'][0]}-{dim_info['scale'][1]} if available, else 1-5) "
-            f"and a brief justification. Format: Score: X. Justification: ..."
+            f"({dim_info['scale'][0]}-{dim_info['scale'][1]}) "
+            f"with precision of 0.01 (e.g., 3.25, 7.50). "
+            f"Format: Score: X. Justification: ..."
         )
 
         return "\n".join(lines)
