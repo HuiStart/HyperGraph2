@@ -34,7 +34,7 @@ dimensions:
 # 决策配置
 decision:
   values: ["accept", "reject"]
-  threshold: 5  # rating >= 5 视为可接受（与官方逻辑对齐：decision字段直接使用）
+  threshold: 6.5  # rating >= 6.5 视为可接受（5-6 边缘，6.5+ 才 Accept）
 
 # 评估指标配置（与官方 evalate.py 完全一致）
 evaluation:

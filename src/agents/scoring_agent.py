@@ -38,7 +38,7 @@ class DimensionScoringAgent:
         evidence: list[dict[str, Any]],
         title: str = "",
     ) -> dict[str, Any]:
-        """Score the assigned dimension.
+        """Score the assigned dimension using deduction-based scoring.
 
         Returns:
             Dict with 'dimension', 'score', 'confidence', 'justification'.
@@ -57,7 +57,7 @@ class DimensionScoringAgent:
         raw_output = self.llm.generate(prompt, system_prompt=system_prompt, max_tokens=1500)
 
         # Parse score
-        score = self._parse_score(raw_output)
+        score = self._parse_score(raw_output, scale_min, scale_max)
         confidence = self._parse_confidence(raw_output)
 
         # Clamp to valid range and round to 0.05 step
@@ -120,8 +120,55 @@ class DimensionScoringAgent:
     ) -> str:
         dim_info = self.rubric.get_dimension(self.dimension)
         scale_text = ""
+        semantic_rubric = ""
         if dim_info:
-            scale_text = f"Scale: {dim_info['scale'][0]}-{dim_info['scale'][1]}. "
+            scale_min, scale_max = dim_info['scale']
+            scale_text = f"Scale: {scale_min}-{scale_max}.\n"
+
+            if self.dimension == "rating":
+                semantic_rubric = (
+                    "SCORING SEMANTICS & SKEPTICISM (CRITICAL):\n"
+                    " - SKEPTICISM RULE: Do NOT treat the authors' claims in the abstract/introduction as facts. "
+                    "'Proposing a method' is NOT a strength. Only empirical results and proofs are strengths.\n\n"
+                    " - 9-10: Paradigm-shifting work (Top 1%). Extremely rare.\n"
+                    " - 7-8: Clear Accept. Flawless methodology AND significant empirical superiority.\n"
+                    " - 5-6: Average/Borderline. Incremental work, or has noticeable methodological gaps.\n"
+                    " - 3-4: Clear Reject. Missing strong baselines, weak evaluations, or lacks novelty.\n"
+                    " - 1-2: Fundamentally flawed.\n\n"
+                    "=== STRICT SCORING CAPS (YOU MUST OBEY) ===\n"
+                    "1. CAP AT 7.0: If you identify ANY notable issue in 'Weaknesses' (e.g., missing a baseline, lack of clarity), "
+                    "the rating MUST NOT exceed 7.0, no matter how many strengths it has.\n"
+                    "2. CAP AT 5.5: If the contribution is merely a combination of existing techniques (incremental), "
+                    "or lacks rigorous ablation studies, the rating MUST NOT exceed 5.5.\n"
+                    "3. DEFAULTS TO 5.0: When in doubt, score between 4.5 and 5.5.\n"
+                )
+            elif self.dimension == "contribution":
+                semantic_rubric = (
+                    "SCORING SEMANTICS & SKEPTICISM (CRITICAL):\n"
+                    " - 4.0: Groundbreaking. Opens a completely new sub-field. (Rarely give this).\n"
+                    " - 3.0: Strong incremental progress. Highly useful to the community.\n"
+                    " - 2.0: Minor incremental progress. A simple combination of known techniques.\n"
+                    " - 1.0: Trivial or already well-known.\n\n"
+                    "=== STRICT SCORING CAPS ===\n"
+                    "1. SKEPTICISM RULE: Authors claiming their work is 'novel' does not make it a 3 or 4. "
+                    "You must independently verify if the core idea is truly new.\n"
+                    "2. CAP AT 3.0: Unless the paper solves a long-standing open problem, the maximum score is 3.0.\n"
+                    "3. CAP AT 2.5: If the method just applies an existing algorithm to a slightly new dataset or task, "
+                    "it is MINOR incremental work. The score MUST NOT exceed 2.5.\n"
+                )
+            else:
+                semantic_rubric = (
+                    "SCORING SEMANTICS:\n"
+                    " - 4.0: Excellent and flawless.\n"
+                    " - 3.0: Good. Solid, but with minor easily fixable issues.\n"
+                    " - 2.0: Fair. Noticeable weaknesses that undermine confidence.\n"
+                    " - 1.0: Poor. Severe flaws.\n\n"
+                    "=== STRICT SCORING CAPS ===\n"
+                    "1. CAP AT 3.0: If you write ANYTHING in the 'Weaknesses' section, the score CANNOT be a 4.0. "
+                    "It must be 3.0 or lower.\n"
+                    "2. CAP AT 2.5 (Soundness): If ablation studies are missing or baselines are weak, "
+                    "the Soundness score MUST NOT exceed 2.5.\n"
+                )
 
         # Evidence section
         evidence_section = ""
@@ -165,8 +212,13 @@ class DimensionScoringAgent:
             )
         elif self.dimension == "contribution":
             reasoning_steps = (
+                "=== FOCUS RULE ===\n"
+                "In this dimension, tolerate experimental weaknesses. "
+                "Focus ONLY on core Idea novelty and potential impact on the field. "
+                "Do NOT let Soundness flaws (missing baselines, no ablation) lower this score.\n\n"
+                "=== REASONING ===\n"
                 "1. Strengths: Highlight novelty, significant advances, or valuable insights.\n"
-                "2. Weaknesses: Note incremental or trivial contributions, lack of novelty.\n"
+                "2. Weaknesses: Note trivial or well-known contributions, lack of novelty.\n"
                 "3. Overall Assessment: Judge the significance and novelty relative to the field."
             )
         else:
@@ -179,7 +231,8 @@ class DimensionScoringAgent:
         return (
             f"Paper: {title}\n\n"
             f"Dimension: {self.dimension.capitalize()}\n"
-            f"{scale_text}\n"
+            f"{scale_text}"
+            f"{semantic_rubric}\n"
             f"{evidence_section}\n\n"
             f"Paper Content:\n{paper_context[:8000]}\n\n"
             f"INSTRUCTIONS:\n"
@@ -207,3 +260,41 @@ class DimensionScoringAgent:
         if match:
             return round_to_step(float(match.group(1)))
         return None
+
+    def _calibrate_by_flaws(self, score: float, text: str, scale_min: int, scale_max: int) -> float:
+        """Post-hoc calibration: if few flaws mentioned, push score down."""
+        import re
+
+        # Count how many flaws were explicitly listed
+        flaw_patterns = [
+            r'^\s*\d+\.\s+.+\(severity:\s*\w+',
+            r'^\s*[-*]\s+.+flaw',
+            r'\bflaw\b|\bweakness\b|\blimitation\b|\berror\b|\bissue\b',
+        ]
+
+        flaw_count = 0
+        lines = text.split('\n')
+        for line in lines:
+            for pattern in flaw_patterns[:2]:
+                if re.search(pattern, line, re.IGNORECASE):
+                    flaw_count += 1
+                    break
+
+        # If very few flaws mentioned but score is high, penalize
+        if self.dimension == "rating":
+            # Rating 1-10
+            if flaw_count < 2 and score > 6.0:
+                # Not critical enough, push down
+                score = max(scale_min, score - 2.0)
+            elif flaw_count < 3 and score > 7.0:
+                score = max(scale_min, score - 1.5)
+            elif flaw_count < 4 and score > 8.0:
+                score = max(scale_min, score - 1.0)
+        else:
+            # Sub-dims 1-4
+            if flaw_count < 1 and score > 2.5:
+                score = max(scale_min, score - 1.0)
+            elif flaw_count < 2 and score > 3.0:
+                score = max(scale_min, score - 0.5)
+
+        return round(score, 2)

@@ -112,6 +112,8 @@ class FastModeScorer(BaseScorer):
         soundness = self._extract_number(meta.get("soundness"))
         presentation = self._extract_number(meta.get("presentation"))
         contribution = self._extract_number(meta.get("contribution"))
+        rating = meta.get("rating")
+        decision = parsed.get("decision", "")
 
         if soundness is None:
             soundness = self._extract_from_raw(raw_output, "soundness")
@@ -119,14 +121,20 @@ class FastModeScorer(BaseScorer):
             presentation = self._extract_from_raw(raw_output, "presentation")
         if contribution is None:
             contribution = self._extract_from_raw(raw_output, "contribution")
+        if rating is None:
+            rating = self._extract_from_raw(raw_output, "rating")
+        if not decision:
+            dec_m = re.search(r'Decision[:\s]+(Accept|Reject)', raw_output, re.IGNORECASE)
+            if dec_m:
+                decision = dec_m.group(1).lower()
 
         # Strong fallback: if still no rating, ask LLM again with simplified prompt
-        if meta.get("rating") is None:
+        if rating is None:
             retry_prompt = (
                 f"Based on your review above, please now output ONLY the numerical scores in this exact format:\n\n"
-                f"Soundness: [1-5]\n"
-                f"Presentation: [1-5]\n"
-                f"Contribution: [1-5]\n"
+                f"Soundness: [1-4]\n"
+                f"Presentation: [1-4]\n"
+                f"Contribution: [1-4]\n"
                 f"Rating: [1-10]\n"
                 f"Decision: [Accept or Reject]"
             )
@@ -138,24 +146,27 @@ class FastModeScorer(BaseScorer):
             raw_output += "\n\n" + retry_output
             # Parse retry output
             for dim in ["soundness", "presentation", "contribution", "rating"]:
-                if locals().get(dim) is None or dim == "rating" and scores.get("rating") is None:
+                val = locals().get(dim)
+                if val is None:
                     m = re.search(rf'{dim.capitalize()}[:\s]+(\d+(?:\.\d+)?)', retry_output, re.IGNORECASE)
                     if m:
-                        if dim == "rating":
-                            scores["rating"] = float(m.group(1))
-                        else:
-                            locals()[dim] = float(m.group(1))
+                        locals()[dim] = round(float(m.group(1)), 2)
             dec_m = re.search(r'Decision[:\s]+(Accept|Reject)', retry_output, re.IGNORECASE)
             if dec_m:
-                scores["decision"] = dec_m.group(1).lower()
+                decision = dec_m.group(1).lower()
 
+        # Build scores dict
         scores = {
-            "rating": meta.get("rating") if meta.get("rating") is not None else scores.get("rating"),
+            "rating": rating,
             "soundness": soundness,
             "presentation": presentation,
             "contribution": contribution,
-            "decision": parsed.get("decision", "reject") if parsed.get("decision") else scores.get("decision", "reject"),
+            "decision": decision.lower() if decision else "reject",
         }
+
+        # Enforce decision consistency with rating threshold
+        if scores.get("rating") is not None and scores["rating"] < 6.5:
+            scores["decision"] = "reject"
 
         return {
             "mode": "fast",
@@ -265,6 +276,10 @@ class StandardModeScorer(BaseScorer):
                 "contribution": self._extract_number(meta.get("contribution")),
                 "decision": parsed.get("decision", "reject"),
             }
+
+        # Enforce decision consistency with rating threshold
+        if aggregated.get("rating") is not None and aggregated["rating"] < 6.5:
+            aggregated["decision"] = "reject"
 
         return {
             "mode": "standard",
@@ -387,6 +402,10 @@ class BestModeScorer(BaseScorer):
                 "contribution": self._extract_number(meta.get("contribution")),
                 "decision": parsed.get("decision", "reject"),
             }
+
+        # Enforce decision consistency with rating threshold
+        if aggregated.get("rating") is not None and aggregated["rating"] < 6.5:
+            aggregated["decision"] = "reject"
 
         return {
             "mode": "best",
