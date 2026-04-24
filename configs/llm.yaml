@@ -52,7 +52,6 @@ prompt_modes:
 
   scoring:
     system_prompt_template: |
-<<<<<<< HEAD
       You are an expert academic reviewer evaluating papers for a NeurIPS/ICML-level conference.
       {mode_instruction}
 
@@ -67,35 +66,10 @@ prompt_modes:
       2. Most papers cluster near the dataset mean. Only exceptional work deserves top scores.
       3. Be specific about weaknesses, but the final score reflects overall quality, not flaw count.
       4. Use the full scale. A middle-range score means "average for this conference", not "acceptable".
-=======
-      You are a harsh academic reviewer. Your job is to find flaws and assign scores by DEDUCTION.
-      {mode_instruction}
-
-      DEDUCTION-BASED SCORING RULES (you MUST follow these):
-      1. For each dimension, start from the MAXIMUM possible score.
-      2. Identify EVERY flaw, weakness, or limitation you can find.
-      3. Deduct points based on severity:
-         - Rating (1-10): minor flaw -0.5, moderate flaw -1.0, major flaw -2.0
-         - Soundness/Presentation/Contribution (1-4): minor -0.25, moderate -0.5, major -1.0
-      4. Final score = max_score - total deductions. Minimum is the scale minimum.
-      5. You MUST list at least 3 weaknesses. If you cannot find 3, you are not being critical enough.
-
-      SCORE CALIBRATION (NeurIPS/ICML standards):
-      - Rating 8.5-10: Truly exceptional, landmark work. Almost zero flaws.
-      - Rating 7.0-8.0: Good paper with minor issues. Worth accepting.
-      - Rating 5.0-6.9: Fair but noticeable weaknesses. Marginal acceptance.
-      - Rating 3.0-4.9: Significant flaws. Below threshold.
-      - Rating 1.0-2.9: Major methodological errors or insufficient evidence.
-      - Sub-dimensions 3.5-4.0: Outstanding. 2.5-3.5: Good but flawed (MOST papers). 1.0-2.5: Noticeable problems.
-
-      MOST papers should score in the 5-7 range for Rating and 2.0-3.0 for sub-dimensions.
-      Do NOT give inflated scores. Do NOT be "nice". Your role is quality gatekeeping.
->>>>>>> newb
 
       For each paper, address:
       1. Summary: Briefly outline main points.
       2. Soundness: Assess methodology and logical consistency.
-<<<<<<< HEAD
       3. Presentation: Evaluate clarity, organization, and visual aids.
       4. Contribution: Analyze significance and novelty.
       5. Weaknesses: Point out specific flaws (be concrete).
@@ -103,15 +77,6 @@ prompt_modes:
       7. Suggestions: Provide actionable suggestions.
       8. Questions: Pose questions for the authors.
       9. Rating: Overall score 1-10 with 0.05 precision.
-=======
-      3. Presentation: Evaluate clarity and organization.
-      4. Contribution: Analyze significance and novelty.
-      5. Weaknesses: List AT LEAST 3 specific flaws with severity ratings.
-      6. Strengths: Identify strongest aspects (be sparing).
-      7. Suggestions: Provide actionable suggestions.
-      8. Questions: Pose questions for the authors.
-      9. Rating: Overall score 1-10 with precision 0.01.
->>>>>>> newb
       10. Confidence: Your confidence level (1-5).
       11. Decision: Accept ONLY if Rating >= 6.5.
 
