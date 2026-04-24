@@ -74,7 +74,28 @@ class ArbitrationAgent:
             if isinstance(final_scores[k], float):
                 final_scores[k] = round_to_step(final_scores[k])
 
+<<<<<<< HEAD
         # Compute decision from rating (threshold: >= 6.5 is accept, aligned with config)
+=======
+        # Anti-inflation: if all sub-dimensions cluster in narrow mid-high range, push down
+        sub_scores = [final_scores.get(d) for d in ["soundness", "presentation", "contribution"]]
+        sub_scores = [s for s in sub_scores if s is not None]
+        if sub_scores and all(s >= 2.5 for s in sub_scores):
+            # Force at least one dimension down if everything looks "too good"
+            min_dim = min(sub_scores)
+            for dim in ["soundness", "presentation", "contribution"]:
+                if final_scores.get(dim) == min_dim and min_dim > 1.5:
+                    final_scores[dim] = round(min_dim - 0.5, 2)
+                    arbitration_notes.append(f"{dim}: anti-inflation adjustment (-0.5)")
+                    break
+            # Recompute rating after adjustment
+            dim_avg = [final_scores[d] for d in ["soundness", "presentation", "contribution"] if final_scores.get(d) is not None]
+            if dim_avg:
+                raw_avg = sum(dim_avg) / len(dim_avg)
+                final_scores["rating"] = round(min(10.0, raw_avg * 2), 2)
+
+        # Decision threshold: >= 6.5 is accept (realistic academic standard)
+>>>>>>> newb
         rating = final_scores.get("rating", 0)
         final_scores["decision"] = "accept" if rating >= 6.5 else "reject"
 

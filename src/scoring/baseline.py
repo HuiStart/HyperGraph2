@@ -112,6 +112,8 @@ class FastModeScorer(BaseScorer):
         soundness = self._extract_number(meta.get("soundness"))
         presentation = self._extract_number(meta.get("presentation"))
         contribution = self._extract_number(meta.get("contribution"))
+        rating = meta.get("rating")
+        decision = parsed.get("decision", "")
 
         if soundness is None:
             soundness = self._extract_from_raw(raw_output, "soundness")
@@ -119,14 +121,20 @@ class FastModeScorer(BaseScorer):
             presentation = self._extract_from_raw(raw_output, "presentation")
         if contribution is None:
             contribution = self._extract_from_raw(raw_output, "contribution")
+        if rating is None:
+            rating = self._extract_from_raw(raw_output, "rating")
+        if not decision:
+            dec_m = re.search(r'Decision[:\s]+(Accept|Reject)', raw_output, re.IGNORECASE)
+            if dec_m:
+                decision = dec_m.group(1).lower()
 
         # Strong fallback: if still no rating, ask LLM again with simplified prompt
-        if meta.get("rating") is None:
+        if rating is None:
             retry_prompt = (
                 f"Based on your review above, please now output ONLY the numerical scores in this exact format:\n\n"
-                f"Soundness: [1-5]\n"
-                f"Presentation: [1-5]\n"
-                f"Contribution: [1-5]\n"
+                f"Soundness: [1-4]\n"
+                f"Presentation: [1-4]\n"
+                f"Contribution: [1-4]\n"
                 f"Rating: [1-10]\n"
                 f"Decision: [Accept or Reject]"
             )
@@ -138,24 +146,27 @@ class FastModeScorer(BaseScorer):
             raw_output += "\n\n" + retry_output
             # Parse retry output
             for dim in ["soundness", "presentation", "contribution", "rating"]:
-                if locals().get(dim) is None or dim == "rating" and scores.get("rating") is None:
+                val = locals().get(dim)
+                if val is None:
                     m = re.search(rf'{dim.capitalize()}[:\s]+(\d+(?:\.\d+)?)', retry_output, re.IGNORECASE)
                     if m:
-                        if dim == "rating":
-                            scores["rating"] = float(m.group(1))
-                        else:
-                            locals()[dim] = float(m.group(1))
+                        locals()[dim] = round(float(m.group(1)), 2)
             dec_m = re.search(r'Decision[:\s]+(Accept|Reject)', retry_output, re.IGNORECASE)
             if dec_m:
-                scores["decision"] = dec_m.group(1).lower()
+                decision = dec_m.group(1).lower()
 
+        # Build scores dict
         scores = {
-            "rating": meta.get("rating") if meta.get("rating") is not None else scores.get("rating"),
+            "rating": rating,
             "soundness": soundness,
             "presentation": presentation,
             "contribution": contribution,
-            "decision": parsed.get("decision", "reject") if parsed.get("decision") else scores.get("decision", "reject"),
+            "decision": decision.lower() if decision else "reject",
         }
+
+        # Enforce decision consistency with rating threshold
+        if scores.get("rating") is not None and scores["rating"] < 6.5:
+            scores["decision"] = "reject"
 
         return {
             "mode": "fast",
@@ -187,6 +198,7 @@ class FastModeScorer(BaseScorer):
         return (
             f"{header}Please review the following research paper.\n\n"
             f"{paper_context}\n\n"
+<<<<<<< HEAD
             f"=== SCORING INSTRUCTIONS ===\n"
             f"You are reviewing for a NeurIPS/ICML-level conference. "
             f"Score this paper by comparing it against typical submissions.\n\n"
@@ -200,6 +212,28 @@ class FastModeScorer(BaseScorer):
             f"2. Most papers cluster near the typical range. Only exceptional work deserves top scores.\n"
             f"3. Be specific in your weaknesses, but score based on overall quality, not flaw count.\n"
             f"4. Use 0.05 precision for all scores (e.g. 3.25, 5.50, 7.15).\n\n"
+=======
+            f"=== CRITICAL SCORING INSTRUCTIONS ===\n"
+            f"You MUST use DEDUCTION-BASED scoring to avoid inflation:\n"
+            f"1. For each dimension, start from the MAXIMUM possible score.\n"
+            f"2. Identify specific flaws, weaknesses, or limitations.\n"
+            f"3. Deduct points for each flaw:\n"
+            f"   - Rating (1-10): minor -0.5, moderate -1.0, major -2.0\n"
+            f"   - Sub-dims (1-4): minor -0.25, moderate -0.5, major -1.0\n"
+            f"4. Final score = max_score - total_deductions.\n\n"
+            f"SCORE ANCHORS (based on NeurIPS/ICML standards):\n"
+            f"- Rating 8.5-10: Truly exceptional, landmark contribution. Almost no flaws.\n"
+            f"- Rating 7.0-8.0: Good paper with minor issues. Worth accepting.\n"
+            f"- Rating 5.0-6.9: Fair but noticeable weaknesses. Marginal.\n"
+            f"- Rating 3.0-4.9: Significant flaws. Below acceptance threshold.\n"
+            f"- Rating 1.0-2.9: Major methodological errors or insufficient evidence.\n"
+            f"- Soundness/Contribution/Presentation 3.5-4.0: Outstanding.\n"
+            f"- 2.5-3.5: Good but flawed (most papers fall here).\n"
+            f"- 1.5-2.5: Noticeable problems.\n"
+            f"- 1.0-1.5: Serious deficiencies.\n\n"
+            f"MOST papers are in the 5-7 (Rating) and 2.0-3.0 (sub-dims) range.\n"
+            f"You MUST find at least 3 weaknesses. If you cannot, you are not being critical enough.\n\n"
+>>>>>>> newb
             f"You MUST output your review in the following exact format:\n\n"
             f"\\boxed_review{{\n"
             f"## Summary:\n[Your summary]\n\n"
@@ -207,7 +241,11 @@ class FastModeScorer(BaseScorer):
             f"## Presentation:\n[Score 1-4 with precision 0.05]\n\n"
             f"## Contribution:\n[Score 1-4 with precision 0.05]\n\n"
             f"## Strengths:\n[Your strengths - be sparing with praise]\n\n"
+<<<<<<< HEAD
             f"## Weaknesses:\n[Your weaknesses - be specific but score holistically]\n\n"
+=======
+            f"## Weaknesses:\n[Your weaknesses - point out at least 3 real flaws]\n\n"
+>>>>>>> newb
             f"## Suggestions:\n[Your suggestions]\n\n"
             f"## Questions:\n[Your questions]\n\n"
             f"## Rating:\n[Overall score 1-10 with precision 0.05]\n\n"
@@ -266,6 +304,10 @@ class StandardModeScorer(BaseScorer):
                 "decision": parsed.get("decision", "reject"),
             }
 
+        # Enforce decision consistency with rating threshold
+        if aggregated.get("rating") is not None and aggregated["rating"] < 6.5:
+            aggregated["decision"] = "reject"
+
         return {
             "mode": "standard",
             "raw_output": raw_output,
@@ -280,6 +322,7 @@ class StandardModeScorer(BaseScorer):
         return (
             f"{header}Please review the following research paper. Simulate multiple reviewers and verify your assessment:\n\n"
             f"{paper_context}\n\n"
+<<<<<<< HEAD
             f"=== SCORING INSTRUCTIONS ===\n"
             f"You are reviewing for a NeurIPS/ICML-level conference. "
             f"Each reviewer should score by comparing against typical submissions.\n\n"
@@ -294,14 +337,39 @@ class StandardModeScorer(BaseScorer):
             f"3. Be specific in weaknesses, but score based on overall quality, not flaw count.\n"
             f"4. Different reviewers may disagree - that is natural and expected.\n"
             f"5. Use 0.05 precision for all scores (e.g. 3.25, 5.50, 7.15).\n\n"
+=======
+            f"=== CRITICAL SCORING INSTRUCTIONS ===\n"
+            f"Each reviewer MUST use DEDUCTION-BASED scoring to avoid inflation:\n"
+            f"1. Start from MAXIMUM score for each dimension.\n"
+            f"2. Identify specific flaws and deduct points:\n"
+            f"   - Rating (1-10): minor -0.5, moderate -1.0, major -2.0\n"
+            f"   - Sub-dims (1-4): minor -0.25, moderate -0.5, major -1.0\n"
+            f"3. Final score = max_score - total_deductions.\n\n"
+            f"SCORE ANCHORS (NeurIPS/ICML standards):\n"
+            f"- Rating 8.5-10: Truly exceptional. Almost no flaws.\n"
+            f"- Rating 7.0-8.0: Good with minor issues. Accept.\n"
+            f"- Rating 5.0-6.9: Fair but flawed. Marginal.\n"
+            f"- Rating 3.0-4.9: Significant flaws. Reject.\n"
+            f"- Rating 1.0-2.9: Major errors or insufficient evidence.\n"
+            f"- Sub-dims 3.5-4.0: Outstanding. 2.5-3.5: Good but flawed. 1.0-2.5: Problems.\n\n"
+            f"MOST papers should score 5-7 (Rating) and 2.0-3.0 (sub-dims).\n"
+            f"Each reviewer MUST find at least 3 weaknesses.\n\n"
+>>>>>>> newb
             f"You MUST wrap all simulated reviewers in the following exact format:\n\n"
             f"\\boxed_simreviewers{{\n"
             f"## Reviewer 1\n"
             f"### Summary:\n...\n"
+<<<<<<< HEAD
             f"### Soundness:\n[Score 1-4 with precision 0.05]\n"
             f"### Presentation:\n[Score 1-4 with precision 0.05]\n"
             f"### Contribution:\n[Score 1-4 with precision 0.05]\n"
             f"### Rating:\n[Score 1-10 with precision 0.05]\n"
+=======
+            f"### Soundness:\n[Score 1-4 with precision 0.01]\n"
+            f"### Presentation:\n[Score 1-4 with precision 0.01]\n"
+            f"### Contribution:\n[Score 1-4 with precision 0.01]\n"
+            f"### Rating:\n[Score 1-10 with precision 0.01]\n"
+>>>>>>> newb
             f"### Decision:\n[Accept or Reject - Accept ONLY if Rating >= 6.5]\n\n"
             f"## Reviewer 2\n...\n"
             f"}}"
@@ -388,6 +456,10 @@ class BestModeScorer(BaseScorer):
                 "decision": parsed.get("decision", "reject"),
             }
 
+        # Enforce decision consistency with rating threshold
+        if aggregated.get("rating") is not None and aggregated["rating"] < 6.5:
+            aggregated["decision"] = "reject"
+
         return {
             "mode": "best",
             "raw_output": final_output,
@@ -429,6 +501,7 @@ class BestModeScorer(BaseScorer):
             f"## Retrieved information:\n{qa_text}\n\n"
             f"Now, please provide the final comprehensive review by simulating {self.reviewer_num} different reviewers. "
             f"Use self-verification to double-check any paper deficiencies identified.\n\n"
+<<<<<<< HEAD
             f"=== SCORING INSTRUCTIONS ===\n"
             f"You are reviewing for a NeurIPS/ICML-level conference. "
             f"Each reviewer should score by comparing against typical submissions.\n\n"
@@ -443,14 +516,39 @@ class BestModeScorer(BaseScorer):
             f"3. Be specific in weaknesses, but score based on overall quality, not flaw count.\n"
             f"4. Different reviewers may disagree - that is natural and expected.\n"
             f"5. Use 0.05 precision for all scores (e.g. 3.25, 5.50, 7.15).\n\n"
+=======
+            f"=== CRITICAL SCORING INSTRUCTIONS ===\n"
+            f"Each reviewer MUST use DEDUCTION-BASED scoring:\n"
+            f"1. Start from MAXIMUM score for each dimension.\n"
+            f"2. Identify specific flaws and deduct points:\n"
+            f"   - Rating (1-10): minor -0.5, moderate -1.0, major -2.0\n"
+            f"   - Sub-dims (1-4): minor -0.25, moderate -0.5, major -1.0\n"
+            f"3. Final score = max_score - total_deductions.\n\n"
+            f"SCORE ANCHORS (NeurIPS/ICML standards):\n"
+            f"- Rating 8.5-10: Truly exceptional. Almost no flaws.\n"
+            f"- Rating 7.0-8.0: Good with minor issues. Accept.\n"
+            f"- Rating 5.0-6.9: Fair but flawed. Marginal.\n"
+            f"- Rating 3.0-4.9: Significant flaws. Reject.\n"
+            f"- Rating 1.0-2.9: Major errors or insufficient evidence.\n"
+            f"- Sub-dims 3.5-4.0: Outstanding. 2.5-3.5: Good but flawed. 1.0-2.5: Problems.\n\n"
+            f"MOST papers should score 5-7 (Rating) and 2.0-3.0 (sub-dims).\n"
+            f"Each reviewer MUST find at least 3 weaknesses.\n\n"
+>>>>>>> newb
             f"You MUST wrap all simulated reviewers in the following exact format:\n\n"
             f"\\boxed_simreviewers{{\n"
             f"## Reviewer 1\n"
             f"### Summary:\n...\n"
+<<<<<<< HEAD
             f"### Soundness:\n[Score 1-4 with precision 0.05]\n"
             f"### Presentation:\n[Score 1-4 with precision 0.05]\n"
             f"### Contribution:\n[Score 1-4 with precision 0.05]\n"
             f"### Rating:\n[Score 1-10 with precision 0.05]\n"
+=======
+            f"### Soundness:\n[Score 1-4 with precision 0.01]\n"
+            f"### Presentation:\n[Score 1-4 with precision 0.01]\n"
+            f"### Contribution:\n[Score 1-4 with precision 0.01]\n"
+            f"### Rating:\n[Score 1-10 with precision 0.01]\n"
+>>>>>>> newb
             f"### Decision:\n[Accept or Reject - Accept ONLY if Rating >= 6.5]\n\n"
             f"## Reviewer 2\n...\n"
             f"}}"

@@ -4,10 +4,19 @@ Dimension Scoring Agent.
 Scores a single dimension (Soundness, Presentation, Contribution, or Rating)
 based on provided evidence and paper context.
 
+<<<<<<< HEAD
 Aligned with DeepReview official scoring agent:
 - Enforces chain-of-thought: Strengths -> Weaknesses -> Score
 - Does NOT use deduction-based scoring or distribution anchoring
 - Lets the LLM judge holistically after analyzing evidence
+=======
+Uses DEDUCTION-BASED scoring to avoid score inflation:
+- Forces the LLM to identify specific flaws first
+- Calculates score by subtracting deductions from maximum
+- This produces discriminative scores across the full scale
+
+Multiple instances of this agent can run in parallel for different dimensions.
+>>>>>>> newb
 """
 
 from typing import Any
@@ -21,7 +30,11 @@ logger = get_logger(__name__)
 
 
 class DimensionScoringAgent:
+<<<<<<< HEAD
     """Agent that scores a specific rubric dimension with chain-of-thought reasoning."""
+=======
+    """Agent that scores a specific rubric dimension using deduction-based scoring."""
+>>>>>>> newb
 
     def __init__(
         self,
@@ -38,7 +51,7 @@ class DimensionScoringAgent:
         evidence: list[dict[str, Any]],
         title: str = "",
     ) -> dict[str, Any]:
-        """Score the assigned dimension.
+        """Score the assigned dimension using deduction-based scoring.
 
         Returns:
             Dict with 'dimension', 'score', 'confidence', 'justification'.
@@ -51,21 +64,36 @@ class DimensionScoringAgent:
         # Build prompt
         prompt = self._build_prompt(paper_context, title, relevant)
 
+<<<<<<< HEAD
         # System prompt aligned with DeepReview official style
         system_prompt = self._build_system_prompt()
+=======
+        # Deduction-based scoring system prompt
+        dim_info = self.rubric.get_dimension(self.dimension)
+        scale_min, scale_max = dim_info["scale"] if dim_info else (1, 10)
+
+        system_prompt = self._build_system_prompt(scale_min, scale_max)
+>>>>>>> newb
 
         raw_output = self.llm.generate(prompt, system_prompt=system_prompt, max_tokens=1500)
 
         # Parse score
-        score = self._parse_score(raw_output)
+        score = self._parse_score(raw_output, scale_min, scale_max)
         confidence = self._parse_confidence(raw_output)
 
+<<<<<<< HEAD
         # Clamp to valid range and round to 0.05 step
         dim_info = self.rubric.get_dimension(self.dimension)
         if dim_info and score is not None:
             scale_min, scale_max = dim_info["scale"]
             score = max(scale_min, min(scale_max, score))
             score = round_to_step(score)
+=======
+        # If score is still inflated (e.g., > 80% of scale for most papers),
+        # apply post-hoc calibration based on justification length (#flaws mentioned)
+        if score is not None:
+            score = self._calibrate_by_flaws(score, raw_output, scale_min, scale_max)
+>>>>>>> newb
 
         return {
             "dimension": self.dimension,
@@ -75,6 +103,7 @@ class DimensionScoringAgent:
             "evidence_used": len(relevant),
         }
 
+<<<<<<< HEAD
     def _build_system_prompt(self) -> str:
         """Build system prompt aligned with DeepReview official style."""
         dim_name = self.dimension.capitalize()
@@ -93,6 +122,59 @@ class DimensionScoringAgent:
                 f"You MUST follow the reasoning structure before assigning a score. "
                 f"Do not skip steps. After completing the analysis, provide the final score "
                 f"with 0.05 precision."
+=======
+    def _build_system_prompt(self, scale_min: int, scale_max: int) -> str:
+        """Build strict system prompt enforcing deduction-based scoring."""
+
+        if self.dimension == "rating":
+            return (
+                f"You are a harsh academic reviewer evaluating the OVERALL quality of a research paper. "
+                f"You MUST use deduction-based scoring. Do NOT give a 'gut feeling' score.\n\n"
+                f"SCORING RULES (Rating scale {scale_min}-{scale_max}):\n"
+                f"1. Start from the MAXIMUM score ({scale_max}).\n"
+                f"2. Identify EVERY flaw, weakness, or limitation you can find.\n"
+                f"3. For each flaw, assign severity:\n"
+                f"   - minor flaw (clarity issue, minor omission): deduct 0.5\n"
+                f"   - moderate flaw (methodological concern, missing comparison): deduct 1.0\n"
+                f"   - major flaw (incorrect claim, missing critical experiment, fatal flaw): deduct 2.0\n"
+                f"4. Calculate: Score = {scale_max} - sum_of_deductions.\n"
+                f"5. Minimum score is {scale_min}.\n\n"
+                f"MOST papers have significant flaws. A typical NeurIPS/ICML submission deserves 5-6. "
+                f"Only truly exceptional, landmark papers deserve 8+. "
+                f"Papers with major methodological errors can go below 4.\n\n"
+                f"You MUST list at least 3 flaws. If you cannot find 3 flaws, you are not being critical enough.\n\n"
+                f"Output format:\n"
+                f"Flaws:\n"
+                f"1. [description] (severity: minor/moderate/major, deduction: X)\n"
+                f"2. ...\n"
+                f"Score: [calculated score with 0.01 precision]\n"
+                f"Justification: [brief reasoning]"
+            )
+        else:
+            return (
+                f"You are a harsh academic reviewer evaluating the '{self.dimension.upper()}' dimension. "
+                f"You MUST use deduction-based scoring. Do NOT give a 'gut feeling' score.\n\n"
+                f"SCORING RULES ({self.dimension.upper()} scale {scale_min}-{scale_max}):\n"
+                f"1. Start from the MAXIMUM score ({scale_max}).\n"
+                f"2. Identify EVERY flaw related to {self.dimension.upper()} you can find.\n"
+                f"3. For each flaw, assign severity:\n"
+                f"   - minor flaw: deduct 0.25\n"
+                f"   - moderate flaw: deduct 0.50\n"
+                f"   - major flaw: deduct 1.00\n"
+                f"4. Calculate: Score = {scale_max} - sum_of_deductions.\n"
+                f"5. Minimum score is {scale_min}.\n\n"
+                f"MOST papers have room for improvement in {self.dimension.upper()}. "
+                f"A typical paper gets 2.0-2.5. Good but flawed papers get 2.5-3.0. "
+                f"Only truly outstanding work deserves 3.5+. "
+                f"Papers with serious problems in this dimension can go below 2.0.\n\n"
+                f"You MUST list at least 2 flaws. If you cannot find 2 flaws, you are not being critical enough.\n\n"
+                f"Output format:\n"
+                f"Flaws:\n"
+                f"1. [description] (severity: minor/moderate/major, deduction: X)\n"
+                f"2. ...\n"
+                f"Score: [calculated score with 0.01 precision]\n"
+                f"Justification: [brief reasoning]"
+>>>>>>> newb
             )
 
     def _filter_evidence(self, evidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -205,6 +287,7 @@ class DimensionScoringAgent:
                 "3. Overall Assessment: Synthesize into a holistic judgment."
             )
 
+<<<<<<< HEAD
         return (
             f"Paper: {title}\n\n"
             f"Dimension: {self.dimension.capitalize()}\n"
@@ -222,14 +305,36 @@ class DimensionScoringAgent:
         )
 
     def _parse_score(self, text: str) -> float | None:
+=======
+        lines.append(
+            f"\nBased on the evidence and paper, evaluate the {self.dimension.upper()} dimension. "
+            f"Follow the deduction-based scoring process in your system instructions. "
+            f"Be CRITICAL. Most papers have significant weaknesses."
+        )
+
+        return "\n".join(lines)
+
+    def _parse_score(self, text: str, scale_min: int, scale_max: int) -> float | None:
+>>>>>>> newb
         """Extract numeric score from response."""
         # Look for "Score: X" pattern
         match = __import__('re').search(r'[Ss]core[:\s]+(\d+(?:\.\d+)?)', text)
         if match:
+<<<<<<< HEAD
             return round_to_step(float(match.group(1)))
         # Fallback to first number
         val = extract_number_from_text(text)
         return round_to_step(val) if val is not None else None
+=======
+            score = round(float(match.group(1)), 2)
+            return max(scale_min, min(scale_max, score))
+        # Fallback to first number
+        val = extract_number_from_text(text)
+        if val is not None:
+            score = round(val, 2)
+            return max(scale_min, min(scale_max, score))
+        return None
+>>>>>>> newb
 
     def _parse_confidence(self, text: str) -> float | None:
         """Extract confidence from response."""
@@ -237,3 +342,41 @@ class DimensionScoringAgent:
         if match:
             return round_to_step(float(match.group(1)))
         return None
+
+    def _calibrate_by_flaws(self, score: float, text: str, scale_min: int, scale_max: int) -> float:
+        """Post-hoc calibration: if few flaws mentioned, push score down."""
+        import re
+
+        # Count how many flaws were explicitly listed
+        flaw_patterns = [
+            r'^\s*\d+\.\s+.+\(severity:\s*\w+',
+            r'^\s*[-*]\s+.+flaw',
+            r'\bflaw\b|\bweakness\b|\blimitation\b|\berror\b|\bissue\b',
+        ]
+
+        flaw_count = 0
+        lines = text.split('\n')
+        for line in lines:
+            for pattern in flaw_patterns[:2]:
+                if re.search(pattern, line, re.IGNORECASE):
+                    flaw_count += 1
+                    break
+
+        # If very few flaws mentioned but score is high, penalize
+        if self.dimension == "rating":
+            # Rating 1-10
+            if flaw_count < 2 and score > 6.0:
+                # Not critical enough, push down
+                score = max(scale_min, score - 2.0)
+            elif flaw_count < 3 and score > 7.0:
+                score = max(scale_min, score - 1.5)
+            elif flaw_count < 4 and score > 8.0:
+                score = max(scale_min, score - 1.0)
+        else:
+            # Sub-dims 1-4
+            if flaw_count < 1 and score > 2.5:
+                score = max(scale_min, score - 1.0)
+            elif flaw_count < 2 and score > 3.0:
+                score = max(scale_min, score - 0.5)
+
+        return round(score, 2)
