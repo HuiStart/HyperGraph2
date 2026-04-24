@@ -120,8 +120,32 @@ class DimensionScoringAgent:
     ) -> str:
         dim_info = self.rubric.get_dimension(self.dimension)
         scale_text = ""
+        semantic_rubric = ""
         if dim_info:
-            scale_text = f"Scale: {dim_info['scale'][0]}-{dim_info['scale'][1]}. "
+            scale_min, scale_max = dim_info['scale']
+            scale_text = f"Scale: {scale_min}-{scale_max}.\n"
+
+            if self.dimension == "rating":
+                semantic_rubric = (
+                    "SCORING SEMANTICS (CRITICAL):\n"
+                    " - 9-10: Award quality. Groundbreaking work.\n"
+                    " - 7-8: Clear Accept. Strong methodology and novelty.\n"
+                    " - 5-6: Borderline/Average. Incremental work or noticeable gaps. (Most papers fall here).\n"
+                    " - 3-4: Clear Reject. Major flaws, missing baselines, or lacks novelty.\n"
+                    " - 1-2: Fundamentally flawed or unreadable.\n\n"
+                    "BASELINE RULE: Assume the paper is a 5.0 (Borderline). "
+                    "You MUST find explicit, strong evidence in 'Strengths' to score above 6.0.\n"
+                )
+            else:
+                semantic_rubric = (
+                    "SCORING SEMANTICS (CRITICAL):\n"
+                    " - 4: Excellent. Flawless execution in this dimension.\n"
+                    " - 3: Good. Solid, but with minor easily fixable issues.\n"
+                    " - 2: Fair. Noticeable weaknesses that undermine confidence.\n"
+                    " - 1: Poor. Severe flaws.\n\n"
+                    "BASELINE RULE: The default score is 2.0 or 2.5. "
+                    "Do not give a 3 or 4 unless you have verified strong evidence.\n"
+                )
 
         # Evidence section
         evidence_section = ""
@@ -165,8 +189,13 @@ class DimensionScoringAgent:
             )
         elif self.dimension == "contribution":
             reasoning_steps = (
+                "=== FOCUS RULE ===\n"
+                "In this dimension, tolerate experimental weaknesses. "
+                "Focus ONLY on core Idea novelty and potential impact on the field. "
+                "Do NOT let Soundness flaws (missing baselines, no ablation) lower this score.\n\n"
+                "=== REASONING ===\n"
                 "1. Strengths: Highlight novelty, significant advances, or valuable insights.\n"
-                "2. Weaknesses: Note incremental or trivial contributions, lack of novelty.\n"
+                "2. Weaknesses: Note trivial or well-known contributions, lack of novelty.\n"
                 "3. Overall Assessment: Judge the significance and novelty relative to the field."
             )
         else:
@@ -179,7 +208,8 @@ class DimensionScoringAgent:
         return (
             f"Paper: {title}\n\n"
             f"Dimension: {self.dimension.capitalize()}\n"
-            f"{scale_text}\n"
+            f"{scale_text}"
+            f"{semantic_rubric}\n"
             f"{evidence_section}\n\n"
             f"Paper Content:\n{paper_context[:8000]}\n\n"
             f"INSTRUCTIONS:\n"
