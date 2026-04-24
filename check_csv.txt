@@ -1,0 +1,12 @@
+(/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag) a510@A510-PC:/media/a510/AE8801F58801BD391/yzx/HDM/HyperGraph2$ python scripts/check_csv.py
+CSV columns: ['inputs', 'outputs', 'year', 'id', 'mode', 'rating', 'decision', 'reviewer_comments']
+
+ reviewer_comments field exists: True
+ reviewer_comments length: 35104
+ reviewer_comments first 500 chars:
+[{"id": "iPXv7gp3v3", "rating": 5, "content": {"summary": "This paper tackles the problem of novel view synthesis with neural radiance fields for unbounded scenes. As studied by prior work, it's crucial to have a good mapping function to handle large free space and long-range distances for unbounded scenes. The authors first formulate NeRF++ and mip-NeRF 360 in a stereographic projection formulation and later propose their p-norm mapping function in the same framework.\n\nThe key insight of this
+
+ Successfully parsed as JSON
+ Number of reviews: 4
+ First review keys: ['id', 'rating', 'content']
+ content keys: ['summary', 'soundness', 'presentation', 'contribution', 'strengths', 'weaknesses', 'questions', 'flag_for_ethics_review', 'rating', 'confidence', 'code_of_conduct', 'weakness', 'suggestions']

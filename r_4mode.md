@@ -46,3 +46,16 @@ python scripts/evaluate_full.py \
     --ground-truth data/processed/test_2024_processed.json \
     --predictions experiments/pred_fast.json
 你先把 Fast 跑通（确认输出有值而不是全 -），再跑其他模式。Fast 通了其他的基本没问题。
+
+
+# 处理数据
+python -m src.cli.main preprocess \
+    --input data/deepreview/test_2024.csv \
+    --output data/processed/test_2024_processed.json
+
+# run
+python scripts/run_ours.py \
+    --input data/processed/test_2024_processed.json \
+    --output experiments/pred_ours.json \
+    --use-llm-evidence \
+    -n 2

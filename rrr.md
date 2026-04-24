@@ -62,3 +62,9 @@ python scripts/run_and_evaluate.py \
     --input data/processed/test_5.json \
     --mode fast \
     --max-samples 2
+
+python scripts/run_ours.py \
+    --input data/processed/test_2024_processed.json \
+    --output experiments/pred_ours.json \
+    --use-llm-evidence \
+    -n 2
