@@ -59,3 +59,15 @@ python scripts/run_ours.py \
     --output experiments/pred_ours.json \
     --use-llm-evidence \
     -n 2
+
+同步代码后，建议先用小批量（如 10 条）测试，重点关注 Soundness 的 true/pred 对比：
+python scripts/run_ours.py \
+    --input data/processed/test_2024_processed.json \
+    --output experiments/ours_results.json \
+    --samples 10
+跑完后用诊断脚本查看：
+
+python scripts/diagnose_scores.py \
+    --ground-truth data/processed/test_2024_processed.json \
+    --predictions experiments/ours_results.json
+如果 Soundness 的 Spearman 转正（> 0），说明修复有效，再跑全量。

@@ -144,8 +144,17 @@ class DimensionScoringAgent:
             )
         elif self.dimension == "soundness":
             reasoning_steps = (
-                "1. Strengths: Detail the methodological rigor, correct proofs, solid experimental design.\n"
-                "2. Weaknesses: Identify flaws, missing validations, incorrect claims, or unsound assumptions.\n"
+                "=== ANTI-GULLIBILITY RULES (Critical) ===\n"
+                "1. DO NOT be fooled by bold claims like 'we rigorously prove'. Look for concrete empirical baselines and ablation studies.\n"
+                "2. DO NOT penalize honest limitation discussions. Acknowledging limitations is a sign of HIGH soundness, not weakness.\n"
+                "3. Complex math without ablation studies is NOT rigorous. Simple, clear, validated methods score higher.\n\n"
+                "=== STRUCTURED CHECKS (Answer before scoring) ===\n"
+                "A. Baseline Check: Are compared baselines strong and recent? (Yes/No/Unclear)\n"
+                "B. Ablation Check: Did they isolate the source of improvement via ablation? (Yes/No/Unclear)\n"
+                "C. Limitation Check: Did they honestly discuss limitations? (Yes = good, No = concern)\n\n"
+                "=== REASONING ===\n"
+                "1. Strengths: Detail methodological rigor, solid experimental design, strong baselines.\n"
+                "2. Weaknesses: Identify real flaws, missing validations, unsupported claims.\n"
                 "3. Overall Assessment: Judge whether the methodology is sound and well-supported."
             )
         elif self.dimension == "presentation":
@@ -172,7 +181,7 @@ class DimensionScoringAgent:
             f"Dimension: {self.dimension.capitalize()}\n"
             f"{scale_text}\n"
             f"{evidence_section}\n\n"
-            f"Paper Content:\n{paper_context[:4000]}\n\n"
+            f"Paper Content:\n{paper_context[:8000]}\n\n"
             f"INSTRUCTIONS:\n"
             f"You MUST follow this exact reasoning structure before assigning a score. Do not skip steps.\n\n"
             f"{reasoning_steps}\n\n"
