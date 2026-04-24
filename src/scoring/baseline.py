@@ -19,7 +19,7 @@ from typing import Any
 from src.scoring.aggregation import aggregate_reviews
 from src.utils.llm_wrapper import LLMWrapper
 from src.utils.logger import get_logger
-from src.utils.parser import parse_deepreviewer_output
+from src.utils.parser import parse_deepreviewer_output, round_to_step
 
 logger = get_logger(__name__)
 
@@ -178,7 +178,7 @@ class FastModeScorer(BaseScorer):
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return round(float(match.group(1)), 2)
+                return round_to_step(float(match.group(1)))
         return None
 
     @staticmethod
@@ -199,18 +199,18 @@ class FastModeScorer(BaseScorer):
             f"1. Do NOT start from max and deduct. Judge absolute quality directly.\n"
             f"2. Most papers cluster near the typical range. Only exceptional work deserves top scores.\n"
             f"3. Be specific in your weaknesses, but score based on overall quality, not flaw count.\n"
-            f"4. Use 0.01 precision for all scores.\n\n"
+            f"4. Use 0.05 precision for all scores (e.g. 3.25, 5.50, 7.15).\n\n"
             f"You MUST output your review in the following exact format:\n\n"
             f"\\boxed_review{{\n"
             f"## Summary:\n[Your summary]\n\n"
-            f"## Soundness:\n[Score 1-4 with precision 0.01]\n\n"
-            f"## Presentation:\n[Score 1-4 with precision 0.01]\n\n"
-            f"## Contribution:\n[Score 1-4 with precision 0.01]\n\n"
+            f"## Soundness:\n[Score 1-4 with precision 0.05]\n\n"
+            f"## Presentation:\n[Score 1-4 with precision 0.05]\n\n"
+            f"## Contribution:\n[Score 1-4 with precision 0.05]\n\n"
             f"## Strengths:\n[Your strengths - be sparing with praise]\n\n"
             f"## Weaknesses:\n[Your weaknesses - be specific but score holistically]\n\n"
             f"## Suggestions:\n[Your suggestions]\n\n"
             f"## Questions:\n[Your questions]\n\n"
-            f"## Rating:\n[Overall score 1-10 with precision 0.01]\n\n"
+            f"## Rating:\n[Overall score 1-10 with precision 0.05]\n\n"
             f"## Confidence:\n[Confidence 1-5]\n\n"
             f"## Decision:\n[Accept or Reject - Accept ONLY if Rating >= 6.5]\n"
             f"}}"
@@ -221,7 +221,7 @@ class FastModeScorer(BaseScorer):
         if not text:
             return None
         match = re.search(r'(\d+(?:\.\d+)?)', str(text))
-        return round(float(match.group(1)), 2) if match else None
+        return round_to_step(float(match.group(1))) if match else None
 
 
 class StandardModeScorer(BaseScorer):
@@ -293,15 +293,15 @@ class StandardModeScorer(BaseScorer):
             f"2. Most papers cluster near the typical range. Only exceptional work deserves top scores.\n"
             f"3. Be specific in weaknesses, but score based on overall quality, not flaw count.\n"
             f"4. Different reviewers may disagree - that is natural and expected.\n"
-            f"5. Use 0.01 precision for all scores.\n\n"
+            f"5. Use 0.05 precision for all scores (e.g. 3.25, 5.50, 7.15).\n\n"
             f"You MUST wrap all simulated reviewers in the following exact format:\n\n"
             f"\\boxed_simreviewers{{\n"
             f"## Reviewer 1\n"
             f"### Summary:\n...\n"
-            f"### Soundness:\n[Score 1-4 with precision 0.01]\n"
-            f"### Presentation:\n[Score 1-4 with precision 0.01]\n"
-            f"### Contribution:\n[Score 1-4 with precision 0.01]\n"
-            f"### Rating:\n[Score 1-10 with precision 0.01]\n"
+            f"### Soundness:\n[Score 1-4 with precision 0.05]\n"
+            f"### Presentation:\n[Score 1-4 with precision 0.05]\n"
+            f"### Contribution:\n[Score 1-4 with precision 0.05]\n"
+            f"### Rating:\n[Score 1-10 with precision 0.05]\n"
             f"### Decision:\n[Accept or Reject - Accept ONLY if Rating >= 6.5]\n\n"
             f"## Reviewer 2\n...\n"
             f"}}"
@@ -312,7 +312,7 @@ class StandardModeScorer(BaseScorer):
         if not text:
             return None
         match = re.search(r'(\d+(?:\.\d+)?)', str(text))
-        return round(float(match.group(1)), 2) if match else None
+        return round_to_step(float(match.group(1))) if match else None
 
 
 class BestModeScorer(BaseScorer):
@@ -442,15 +442,15 @@ class BestModeScorer(BaseScorer):
             f"2. Most papers cluster near the typical range. Only exceptional work deserves top scores.\n"
             f"3. Be specific in weaknesses, but score based on overall quality, not flaw count.\n"
             f"4. Different reviewers may disagree - that is natural and expected.\n"
-            f"5. Use 0.01 precision for all scores.\n\n"
+            f"5. Use 0.05 precision for all scores (e.g. 3.25, 5.50, 7.15).\n\n"
             f"You MUST wrap all simulated reviewers in the following exact format:\n\n"
             f"\\boxed_simreviewers{{\n"
             f"## Reviewer 1\n"
             f"### Summary:\n...\n"
-            f"### Soundness:\n[Score 1-4 with precision 0.01]\n"
-            f"### Presentation:\n[Score 1-4 with precision 0.01]\n"
-            f"### Contribution:\n[Score 1-4 with precision 0.01]\n"
-            f"### Rating:\n[Score 1-10 with precision 0.01]\n"
+            f"### Soundness:\n[Score 1-4 with precision 0.05]\n"
+            f"### Presentation:\n[Score 1-4 with precision 0.05]\n"
+            f"### Contribution:\n[Score 1-4 with precision 0.05]\n"
+            f"### Rating:\n[Score 1-10 with precision 0.05]\n"
             f"### Decision:\n[Accept or Reject - Accept ONLY if Rating >= 6.5]\n\n"
             f"## Reviewer 2\n...\n"
             f"}}"
@@ -546,7 +546,7 @@ class BestModeScorer(BaseScorer):
         if not text:
             return None
         match = re.search(r'(\d+(?:\.\d+)?)', str(text))
-        return round(float(match.group(1)), 2) if match else None
+        return round_to_step(float(match.group(1))) if match else None
 
 
 def run_baseline(

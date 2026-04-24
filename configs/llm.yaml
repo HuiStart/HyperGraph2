@@ -76,7 +76,7 @@ prompt_modes:
       6. Strengths: Identify strongest aspects (be sparing).
       7. Suggestions: Provide actionable suggestions.
       8. Questions: Pose questions for the authors.
-      9. Rating: Overall score 1-10 with 0.01 precision.
+      9. Rating: Overall score 1-10 with 0.05 precision.
       10. Confidence: Your confidence level (1-5).
       11. Decision: Accept ONLY if Rating >= 6.5.
 
