@@ -80,7 +80,7 @@ class EvidenceExtractor:
         return unique_evidence
 
     def _extract_claims(self, sections: dict[str, Any], title: str) -> list[dict[str, Any]]:
-        """Extract core claims from abstract and introduction."""
+        """Extract core claims from abstract and introduction (positive and negative)."""
         evidence = []
 
         for section_name in ["abstract", "introduction"]:
@@ -101,10 +101,20 @@ class EvidenceExtractor:
                         "confidence": 0.85,
                     })
 
+            # Negative evidence: very short abstract/intro may indicate unclear contribution
+            if section_name == "abstract" and len(text) < 150:
+                evidence.append({
+                    "source_type": "weak_claim_evidence",
+                    "section": "abstract",
+                    "evidence_text": "Abstract is unusually short (less than 150 chars), suggesting unclear or under-specified contribution.",
+                    "related_dimension": "Contribution",
+                    "confidence": 0.6,
+                })
+
         return evidence
 
     def _extract_methods(self, sections: dict[str, Any]) -> list[dict[str, Any]]:
-        """Extract methodology evidence."""
+        """Extract methodology evidence (positive and negative)."""
         evidence = []
 
         method_text = sections.get("methods", "")
@@ -128,16 +138,36 @@ class EvidenceExtractor:
                         "related_dimension": "Soundness",
                         "confidence": 0.8,
                     })
+            # Negative evidence: very short methods section
+            if len(method_text) < 300:
+                evidence.append({
+                    "source_type": "weak_method_evidence",
+                    "section": "methods",
+                    "evidence_text": "Methods section is unusually short (less than 300 chars), suggesting insufficient detail.",
+                    "related_dimension": "Soundness",
+                    "confidence": 0.7,
+                })
+        else:
+            # Negative evidence: missing methods
+            evidence.append({
+                "source_type": "missing_method_evidence",
+                "section": "methods",
+                "evidence_text": "No dedicated methods section found in the paper.",
+                "related_dimension": "Soundness",
+                "confidence": 0.9,
+            })
 
         return evidence
 
     def _extract_experiments(self, sections: dict[str, Any]) -> list[dict[str, Any]]:
-        """Extract experimental evidence."""
+        """Extract experimental evidence (positive and negative)."""
         evidence = []
+        found_any = False
 
         for section_name in ["experiments", "results", "evaluation"]:
             text = sections.get(section_name, "")
             if text:
+                found_any = True
                 paragraphs = text.split('\n\n')
                 for para in paragraphs[:3]:
                     para = para.strip()
@@ -149,6 +179,25 @@ class EvidenceExtractor:
                             "related_dimension": "Soundness",
                             "confidence": 0.75,
                         })
+                # Negative evidence: very short experiments section
+                if len(text) < 200:
+                    evidence.append({
+                        "source_type": "weak_experiment_evidence",
+                        "section": section_name,
+                        "evidence_text": f"{section_name} section is unusually short (less than 200 chars), suggesting insufficient experimental detail.",
+                        "related_dimension": "Soundness",
+                        "confidence": 0.7,
+                    })
+
+        if not found_any:
+            # Negative evidence: missing experiments
+            evidence.append({
+                "source_type": "missing_experiment_evidence",
+                "section": "experiments",
+                "evidence_text": "No experiments, results, or evaluation section found in the paper.",
+                "related_dimension": "Soundness",
+                "confidence": 0.9,
+            })
 
         return evidence
 

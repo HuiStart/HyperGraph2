@@ -73,9 +73,9 @@ class ArbitrationAgent:
             if isinstance(final_scores[k], float):
                 final_scores[k] = round(final_scores[k], 2)
 
-        # Compute decision from rating (threshold: >= 5 is accept)
+        # Compute decision from rating (threshold: >= 6.5 is accept, aligned with config)
         rating = final_scores.get("rating", 0)
-        final_scores["decision"] = "accept" if rating >= 5 else "reject"
+        final_scores["decision"] = "accept" if rating >= 6.5 else "reject"
 
         return {
             "final_scores": final_scores,
