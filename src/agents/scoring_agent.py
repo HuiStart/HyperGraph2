@@ -115,13 +115,14 @@ class DimensionScoringAgent:
         # Look for "Score: X" pattern
         match = __import__('re').search(r'[Ss]core[:\s]+(\d+(?:\.\d+)?)', text)
         if match:
-            return float(match.group(1))
+            return round(float(match.group(1)), 2)
         # Fallback to first number
-        return extract_number_from_text(text)
+        val = extract_number_from_text(text)
+        return round(val, 2) if val is not None else None
 
     def _parse_confidence(self, text: str) -> float | None:
         """Extract confidence from response."""
         match = __import__('re').search(r'[Cc]onfidence[:\s]+(\d+(?:\.\d+)?)', text)
         if match:
-            return float(match.group(1))
+            return round(float(match.group(1)), 2)
         return None

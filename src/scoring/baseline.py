@@ -178,7 +178,7 @@ class FastModeScorer(BaseScorer):
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return float(match.group(1))
+                return round(float(match.group(1)), 2)
         return None
 
     @staticmethod
@@ -208,7 +208,7 @@ class FastModeScorer(BaseScorer):
         if not text:
             return None
         match = re.search(r'(\d+(?:\.\d+)?)', str(text))
-        return float(match.group(1)) if match else None
+        return round(float(match.group(1)), 2) if match else None
 
 
 class StandardModeScorer(BaseScorer):
@@ -285,7 +285,7 @@ class StandardModeScorer(BaseScorer):
         if not text:
             return None
         match = re.search(r'(\d+(?:\.\d+)?)', str(text))
-        return float(match.group(1)) if match else None
+        return round(float(match.group(1)), 2) if match else None
 
 
 class BestModeScorer(BaseScorer):
@@ -505,7 +505,7 @@ class BestModeScorer(BaseScorer):
         if not text:
             return None
         match = re.search(r'(\d+(?:\.\d+)?)', str(text))
-        return float(match.group(1)) if match else None
+        return round(float(match.group(1)), 2) if match else None
 
 
 def run_baseline(

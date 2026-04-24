@@ -19,16 +19,16 @@ dimensions:
     scale: [1, 10]
     key: "rating"
   - name: "Soundness"
-    description: "Assess methodology and logical consistency (1-5)"
-    scale: [1, 5]
+    description: "Assess methodology and logical consistency (1-4)"
+    scale: [1, 4]
     key: "soundness"
   - name: "Presentation"
-    description: "Evaluate clarity, organization, and visual aids (1-5)"
-    scale: [1, 5]
+    description: "Evaluate clarity, organization, and visual aids (1-4)"
+    scale: [1, 4]
     key: "presentation"
   - name: "Contribution"
-    description: "Analyze significance and novelty in the field (1-5)"
-    scale: [1, 5]
+    description: "Analyze significance and novelty in the field (1-4)"
+    scale: [1, 4]
     key: "contribution"
 
 # 决策配置

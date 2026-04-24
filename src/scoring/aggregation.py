@@ -33,25 +33,25 @@ def aggregate_scores(
         return None
 
     if method == "mean":
-        return float(np.mean(valid_scores))
+        return round(float(np.mean(valid_scores)), 2)
     elif method == "median":
-        return float(np.median(valid_scores))
+        return round(float(np.median(valid_scores)), 2)
     elif method == "trimmed_mean":
         if len(valid_scores) <= 2:
-            return float(np.mean(valid_scores))
+            return round(float(np.mean(valid_scores)), 2)
         # Trim 10% from each end
         trim_ratio = 0.1
         k = int(len(valid_scores) * trim_ratio)
         sorted_scores = sorted(valid_scores)
         trimmed = sorted_scores[k:len(sorted_scores) - k] if k > 0 else sorted_scores
-        return float(np.mean(trimmed))
+        return round(float(np.mean(trimmed)), 2)
     elif method == "weighted" and weights:
         valid_weights = [w for s, w in zip(scores, weights) if s is not None]
         if sum(valid_weights) == 0:
-            return float(np.mean(valid_scores))
-        return float(np.average(valid_scores, weights=valid_weights))
+            return round(float(np.mean(valid_scores)), 2)
+        return round(float(np.average(valid_scores, weights=valid_weights)), 2)
     else:
-        return float(np.mean(valid_scores))
+        return round(float(np.mean(valid_scores)), 2)
 
 
 def aggregate_reviews(

@@ -39,7 +39,7 @@ def extract_numeric_score(value: Any) -> float | None:
     # Try to match leading number (integer or float)
     match = re.match(r'(\d+(?:\.\d+)?)', text)
     if match:
-        return float(match.group(1))
+        return round(float(match.group(1)), 2)
 
     return None
 

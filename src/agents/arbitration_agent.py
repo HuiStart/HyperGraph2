@@ -79,10 +79,19 @@ class ArbitrationAgent:
             if dim in final_scores and final_scores[dim] is not None:
                 dim_avg.append(final_scores[dim])
 
+        # Round all dimension scores to 2 decimals
+        for k in list(final_scores.keys()):
+            if isinstance(final_scores[k], float):
+                final_scores[k] = round(final_scores[k], 2)
+
         if dim_avg:
-            # Scale to 1-10: average of 1-5 dimensions, doubled
+            # Scale to 1-10: average of 1-4 dimensions, doubled
             raw_avg = sum(dim_avg) / len(dim_avg)
-            final_scores["rating"] = min(10.0, raw_avg * 2)
+            final_scores["rating"] = round(min(10.0, raw_avg * 2), 2)
+
+        # Compute decision from rating (threshold: >= 5 is accept)
+        rating = final_scores.get("rating", 0)
+        final_scores["decision"] = "accept" if rating >= 5 else "reject"
 
         return {
             "final_scores": final_scores,

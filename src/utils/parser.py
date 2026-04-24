@@ -20,7 +20,7 @@ def extract_number_from_text(text: str) -> float | None:
         return None
     match = re.search(r'(\d+(?:\.\d+)?)', str(text))
     if match:
-        return float(match.group(1))
+        return round(float(match.group(1)), 2)
     return None
 
 
