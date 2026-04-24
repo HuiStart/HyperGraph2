@@ -51,7 +51,11 @@ class DimensionScoringAgent:
         # Generate score
         system_prompt = (
             f"You are an expert academic reviewer scoring the '{self.dimension}' dimension. "
-            f"Provide a numeric score and brief justification. Be objective and cite evidence."
+            f"Be STRICT and CRITICAL. Most papers have significant room for improvement. "
+            f"Do not inflate scores. Use the full scale. "
+            f"A middle-range score means 'fair but flawed', not 'acceptable'. "
+            f"Reserve high scores only for truly exceptional work. "
+            f"Provide a numeric score and brief justification. Cite evidence."
         )
 
         raw_output = self.llm.generate(prompt, system_prompt=system_prompt, max_tokens=1500)
@@ -108,6 +112,17 @@ class DimensionScoringAgent:
             f"with precision of 0.01 (e.g., 3.25, 7.50). "
             f"Format: Score: X. Justification: ..."
         )
+
+        # Few-shot examples to anchor score standards
+        scale_min, scale_max = dim_info["scale"]
+        mid = (scale_min + scale_max) / 2
+        low = scale_min + (scale_max - scale_min) * 0.25
+        high = scale_min + (scale_max - scale_min) * 0.75
+        lines.append(f"\nScore calibration examples:")
+        lines.append(f"- Score {low:.2f}: Major flaws or insufficient evidence.")
+        lines.append(f"- Score {mid:.2f}: Fair but noticeable weaknesses.")
+        lines.append(f"- Score {high:.2f}: Good with minor issues.")
+        lines.append(f"- Score {scale_max:.2f}: Truly exceptional, no significant weaknesses.")
 
         return "\n".join(lines)
 
