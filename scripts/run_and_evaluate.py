@@ -23,7 +23,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.evaluation.metrics import compute_all_metrics, format_metrics_table
-from src.scoring.baseline import run_baseline
+from src.scoring.baseline import FastModeScorer, StandardModeScorer, BestModeScorer
+from src.utils.llm_wrapper import LLMWrapper
 from src.utils.logger import setup_logger
 
 
@@ -55,6 +56,19 @@ def main():
     if args.max_samples:
         samples = samples[:args.max_samples]
 
+    # Init LLM and scorer directly (same as debug_llm.py)
+    llm = LLMWrapper(args.llm_config)
+    llm.set_model("cloud_default")
+
+    if args.mode == "fast":
+        scorer = FastModeScorer(llm)
+    elif args.mode == "standard":
+        scorer = StandardModeScorer(llm)
+    elif args.mode == "best":
+        scorer = BestModeScorer(llm)
+    else:
+        raise ValueError(f"Unknown mode: {args.mode}")
+
     dimensions = [
         ("rating", "Rating"),
         ("soundness", "Soundness"),
@@ -66,23 +80,28 @@ def main():
     y_pred = {d[0]: [] for d in dimensions}
     decisions_true = []
     decisions_pred = []
+    results = []
 
     print("=" * 110)
     print(f"{'Sample':<8} {'ID':<15} {'Rating':<12} {'Soundness':<12} {'Presentation':<14} {'Contribution':<14} {'Decision':<16}")
     print("=" * 110)
 
-    # Run baseline and evaluate sample by sample
-    results = run_baseline(
-        samples=samples,
-        mode=args.mode,
-        output_path=args.output_pred,
-        llm_config=args.llm_config,
-    )
-
-    for i, (sample, result) in enumerate(zip(samples, results)):
+    for i, sample in enumerate(samples):
         sid = sample.get("id", "")
         gt_scores = sample.get("ground_truth", {})
-        pred_scores = result.get("scores", {})
+
+        try:
+            result = scorer.score(
+                paper_context=sample["paper_context"],
+                title=sample.get("title", ""),
+            )
+            result["sample_id"] = sid
+            results.append(result)
+            pred_scores = result.get("scores", {})
+        except Exception as e:
+            print(f"ERROR on {sid}: {e}")
+            results.append({"sample_id": sid, "error": str(e), "scores": {}})
+            pred_scores = {}
 
         # Print comparison row
         row_vals = [f"{i+1}/{len(samples)}", sid[:12]]
@@ -103,6 +122,14 @@ def main():
         print(f"{row_vals[0]:<8} {row_vals[1]:<15} {row_vals[2]:<12} {row_vals[3]:<12} {row_vals[4]:<14} {row_vals[5]:<14} {row_vals[6]:<16}")
 
     print("=" * 110)
+
+    # Save predictions if requested
+    if args.output_pred:
+        out_path = Path(args.output_pred)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+        print(f"Predictions saved to {args.output_pred}")
 
     if not y_true["rating"]:
         print("No valid samples to evaluate.")
