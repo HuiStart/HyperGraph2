@@ -56,14 +56,18 @@ class DimensionScoringAgent:
 
         raw_output = self.llm.generate(prompt, system_prompt=system_prompt, max_tokens=1500)
 
+        # Get scale info before parsing
+        dim_info = self.rubric.get_dimension(self.dimension)
+        scale_min, scale_max = (1, 10)  # defaults
+        if dim_info:
+            scale_min, scale_max = dim_info["scale"]
+
         # Parse score
-        score = self._parse_score(raw_output, scale_min, scale_max)
+        score = self._parse_score(raw_output)
         confidence = self._parse_confidence(raw_output)
 
         # Clamp to valid range and round to 0.05 step
-        dim_info = self.rubric.get_dimension(self.dimension)
-        if dim_info and score is not None:
-            scale_min, scale_max = dim_info["scale"]
+        if score is not None:
             score = max(scale_min, min(scale_max, score))
             score = round_to_step(score)
 
