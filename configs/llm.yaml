@@ -16,10 +16,10 @@ ollama:
       # 本地8GB显存配置
       context_window: 32000
     cloud_default:
-      name: "deepseek-r1:32b-16k"
-      # name: "qwen2.5:14b-16k"
-      temperature: 0.4
-      top_p: 0.95
+      # name: "deepseek-r1:32b-16k"
+      name: "qwen2.5:14b-16k"
+      temperature: 0.9
+      top_p: 0.7
       max_tokens: 35000
       # 云服务器双卡16GB配置
       context_window: 16384
