@@ -149,18 +149,18 @@ class PromptOnlyScorer(BaseScorer):
         # Extract each dimension with multiple fallback patterns
         for dim in ["soundness", "presentation", "contribution", "rating", "confidence"]:
             val = None
-            # Pattern 1: "Rating: 8.0" or "rating = 8"
-            match = re.search(rf'{dim}[\s]*[:=][\s]*(\d+(?:\.\d+)?)', text, re.IGNORECASE)
+            # Pattern 1: "Rating: 8.0" or "rating = 8" or "Rating: [8.0]"
+            match = re.search(rf'{dim}[\s]*[:=][\s]*[\[\(]?(\d+(?:\.\d+)?)[\]\)]?', text, re.IGNORECASE)
             if match:
                 val = float(match.group(1))
-            # Pattern 2: markdown bold "**Rating**: 8.0"
+            # Pattern 2: markdown bold "**Rating**: 8.0" or "**Rating**: [8.0]"
             if val is None:
-                match = re.search(rf'\*?\*{dim}\*?\*[\s]*[:=][\s]*(\d+(?:\.\d+)?)', text, re.IGNORECASE)
+                match = re.search(rf'\*?\*{dim}\*?\*[\s]*[:=][\s]*[\[\(]?(\d+(?:\.\d+)?)[\]\)]?', text, re.IGNORECASE)
                 if match:
                     val = float(match.group(1))
             # Pattern 3: loose match on the line
             if val is None:
-                match = re.search(rf'^{dim}[\s]*[:=]?[\s]*(\d+(?:\.\d+)?)', text, re.IGNORECASE | re.MULTILINE)
+                match = re.search(rf'^{dim}[\s]*[:=]?[\s]*[\[\(]?(\d+(?:\.\d+)?)[\]\)]?', text, re.IGNORECASE | re.MULTILINE)
                 if match:
                     val = float(match.group(1))
 

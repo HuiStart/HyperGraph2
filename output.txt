@@ -1,0 +1,128 @@
+(/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag) a510@A510-PC:/media/a510/AE8801F58801BD391/yzx/HDM/HyperGraph2$ python scripts/run_ablation_prompt_only.py     --input data/processed/test_2024_processed.json     --output experiments/prompt/pred_1.json      -n 20
+==============================================================================================================
+Sample   ID              Rating       Soundness    Presentation   Contribution   Decision        
+==============================================================================================================
+
+[DEBUG] Sample w7BwaDHppp raw output (first 800 chars):
+Soundness: [2.50]
+Presentation: [3.00]
+Contribution: [2.50]
+Rating: [4.85]
+Confidence: [4]
+Decision: Reject
+
+Weaknesses:
+- The paper lacks rigorous ablation studies to validate the effectiveness of the proposed $p$-norm distance mapping function and its impact on different scenes.
+- The methodology is not entirely clear, particularly in the automatic setting of the $p$ value using RANSAC. This part needs more detailed explanation and validation through experiments.
+- There are missing baselines for comparison. While the paper mentions existing methods like NeRF+, mip-NeRF 360, and Zip-NeRF, it does not provide a comprehensive comparison with these techniques.
+- The experimental evaluation is limited to a few datasets and does not cover a wide range of scenarios or include more challenging 
+[DEBUG END]
+
+1/20     w7BwaDHppp      5.50/-       2.75/-       2.75/-         2.25/-         Accept/Reject   
+
+[DEBUG] Sample u4CQHLTfg5 raw output (first 800 chars):
+Soundness: [2.50]
+Presentation: [3.00]
+Contribution: [2.50]
+Rating: [4.75]
+Confidence: [4]
+Decision: Reject
+
+Weaknesses:
+- The paper lacks a clear and rigorous ablation study to validate the proposed individual cost metric.
+- The empirical evidence presented is insufficient to conclusively refute the existence of a trade-off between group and individual fairness.
+- The theoretical derivations are complex but lack concrete experimental validation or comparison with existing metrics.
+- The discussion on parameter selection for calculating individual cost is not comprehensive enough, leaving room for ambiguity in practical applications.
+
+Strengths:
+- Provides a detailed analysis clarifying the relationship between individual fairness and group fairness.
+- Offers new insights into the behavior
+[DEBUG END]
+
+2/20     u4CQHLTfg5      3.00/-       2.67/-       2.00/-         1.67/-         Reject/Reject   
+3/20     tlqmkftgpw      5.40/-       2.40/-       2.60/-         2.20/-         Reject/Reject   
+4/20     tc1jaWpi7M      5.75/-       2.50/-       2.75/-         2.25/-         Reject/Reject   
+5/20     syoLhUJmth      3.75/5.50    2.25/2.50    2.25/3.00      2.25/2.50      Reject/Reject   
+6/20     sqRgz88TM3      6.33/-       2.67/-       3.00/-         2.67/-         Accept/Accept   
+7/20     sllU8vvsFF      6.25/-       3.75/-       3.50/-         3.75/-         Accept/Reject   
+8/20     slSmYGc8ee      6.75/-       3.00/-       2.75/-         2.50/-         Accept/Reject   
+9/20     sdn7ocpvuX      3.00/-       1.50/-       3.00/-         1.75/-         Reject/Reject   
+10/20    sdev4EomdC      4.25/-       2.50/-       2.75/-         2.50/-         Reject/Reject   
+11/20    ruQkcBfzpm      5.50/-       2.75/-       3.00/-         2.50/-         Reject/Reject   
+12/20    ruGY8v10mK      6.50/-       2.75/-       2.25/-         2.25/-         Accept/Reject   
+13/20    rnHqwPH4TZ      5.50/5.50    2.75/2.50    2.75/3.00      2.50/2.50      Reject/Reject   
+14/20    rlCyHDzOjj      4.75/-       2.50/-       2.00/-         2.00/-         Reject/Reject   
+15/20    qiOqgphnVL      3.67/-       2.33/-       2.33/-         2.33/-         Reject/Reject   
+16/20    qL9gogRepu      7.00/-       3.25/-       3.75/-         3.00/-         Accept/Reject   
+17/20    qL6brrBDk2      7.25/-       3.25/-       3.25/-         3.25/-         Accept/Reject   
+18/20    pZhdz4oyzo      5.75/-       3.00/-       2.75/-         2.25/-         Reject/Reject   
+19/20    pVaMBfI2eR      5.00/-       2.33/-       2.67/-         2.00/-         Reject/Reject   
+20/20    pVKEFtGkM6      5.50/-       2.50/-       2.50/-         2.00/-         Reject/Reject   
+==============================================================================================================
+
+Results saved to: experiments/prompt/pred_1.json
+/media/a510/AE8801F58801BD391/yzx/HDM/HyperGraph2/src/evaluation/metrics.py:56: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  corr, _ = spearmanr(y_true, y_pred)
+/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag/lib/python3.10/site-packages/numpy/lib/_function_base_impl.py:2922: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag/lib/python3.10/site-packages/numpy/lib/_function_base_impl.py:2923: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+/media/a510/AE8801F58801BD391/yzx/HDM/HyperGraph2/src/evaluation/metrics.py:56: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  corr, _ = spearmanr(y_true, y_pred)
+/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag/lib/python3.10/site-packages/numpy/lib/_function_base_impl.py:2922: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag/lib/python3.10/site-packages/numpy/lib/_function_base_impl.py:2923: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+/media/a510/AE8801F58801BD391/yzx/HDM/HyperGraph2/src/evaluation/metrics.py:56: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  corr, _ = spearmanr(y_true, y_pred)
+/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag/lib/python3.10/site-packages/numpy/lib/_function_base_impl.py:2922: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag/lib/python3.10/site-packages/numpy/lib/_function_base_impl.py:2923: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+/media/a510/AE8801F58801BD391/yzx/HDM/HyperGraph2/src/evaluation/metrics.py:56: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  corr, _ = spearmanr(y_true, y_pred)
+/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag/lib/python3.10/site-packages/numpy/lib/_function_base_impl.py:2922: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag/lib/python3.10/site-packages/numpy/lib/_function_base_impl.py:2923: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+/media/a510/AE8801F58801BD391/yzx/conda_envs/hdmag/lib/python3.10/site-packages/sklearn/metrics/_classification.py:409: UserWarning: A single label was found in 'y_true' and 'y_pred'. For the confusion matrix to have the correct shape, use the 'labels' parameter to pass all known labels.
+  warnings.warn(
+2026-04-27 13:31:14 - src.evaluation.metrics - WARNING - QWK computation failed: division by zero
+
+============================================================
+Final Metrics (Prompt-Only Ablation)
+============================================================
+## Results for Method
+
+| Metric | Value |
+|---|---|
+| Rating MSE | 1.5312 |
+| Rating MAE | 0.8750 |
+| Rating RMSE | 1.2374 |
+| Rating SPEARMAN | nan |
+| Rating PEARSON | nan |
+| Rating PAIRWISE_ACC | 1.0000 |
+| Rating QWK | 0.0000 |
+| Soundness MSE | 0.0625 |
+| Soundness MAE | 0.2500 |
+| Soundness RMSE | 0.2500 |
+| Soundness SPEARMAN | nan |
+| Soundness PEARSON | nan |
+| Soundness PAIRWISE_ACC | 1.0000 |
+| Soundness QWK | 0.0000 |
+| Presentation MSE | 0.3125 |
+| Presentation MAE | 0.5000 |
+| Presentation RMSE | 0.5590 |
+| Presentation SPEARMAN | nan |
+| Presentation PEARSON | nan |
+| Presentation PAIRWISE_ACC | 1.0000 |
+| Presentation QWK | 0.0000 |
+| Contribution MSE | 0.0312 |
+| Contribution MAE | 0.1250 |
+| Contribution RMSE | 0.1768 |
+| Contribution SPEARMAN | nan |
+| Contribution PEARSON | nan |
+| Contribution PAIRWISE_ACC | 1.0000 |
+| Contribution QWK | nan |
+| Decision Accuracy | 0.7000 |
+| Decision F1 (macro) | 0.5312 |
