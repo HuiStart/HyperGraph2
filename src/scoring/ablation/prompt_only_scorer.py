@@ -133,7 +133,7 @@ class PromptOnlyScorer(BaseScorer):
 
     @staticmethod
     def _parse_scores(text: str) -> dict[str, Any]:
-        """Extract scores from structured output."""
+        """Extract scores from structured output with robust pattern matching."""
         scores = {
             "soundness": None,
             "presentation": None,
@@ -143,16 +143,32 @@ class PromptOnlyScorer(BaseScorer):
             "decision": None,
         }
 
-        # Extract each dimension
+        if not text:
+            return scores
+
+        # Extract each dimension with multiple fallback patterns
         for dim in ["soundness", "presentation", "contribution", "rating", "confidence"]:
-            pattern = rf'{dim.capitalize()}[:\s]+(\d+(?:\.\d+)?)'
-            match = re.search(pattern, text, re.IGNORECASE)
+            val = None
+            # Pattern 1: "Rating: 8.0" or "rating = 8"
+            match = re.search(rf'{dim}[\s]*[:=][\s]*(\d+(?:\.\d+)?)', text, re.IGNORECASE)
             if match:
                 val = float(match.group(1))
+            # Pattern 2: markdown bold "**Rating**: 8.0"
+            if val is None:
+                match = re.search(rf'\*?\*{dim}\*?\*[\s]*[:=][\s]*(\d+(?:\.\d+)?)', text, re.IGNORECASE)
+                if match:
+                    val = float(match.group(1))
+            # Pattern 3: loose match on the line
+            if val is None:
+                match = re.search(rf'^{dim}[\s]*[:=]?[\s]*(\d+(?:\.\d+)?)', text, re.IGNORECASE | re.MULTILINE)
+                if match:
+                    val = float(match.group(1))
+
+            if val is not None:
                 scores[dim] = round_to_step(val)
 
         # Extract decision
-        dec_match = re.search(r'Decision[:\s]+(Accept|Reject)', text, re.IGNORECASE)
+        dec_match = re.search(r'Decision[\s]*[:=][\s]*(Accept|Reject)', text, re.IGNORECASE)
         if dec_match:
             scores["decision"] = dec_match.group(1).lower()
         else:

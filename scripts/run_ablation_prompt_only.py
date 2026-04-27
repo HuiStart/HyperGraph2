@@ -80,8 +80,15 @@ def main():
             title=sample.get("title", ""),
         )
         result["sample_id"] = sid
+        result["title"] = sample.get("title", "")
         results.append(result)
         pred_scores = result.get("scores", {})
+
+        # Debug: print raw output for first 2 samples to verify LLM response format
+        if i < 2:
+            print(f"\n[DEBUG] Sample {sid} raw output (first 800 chars):")
+            print(result.get("raw_output", "")[:800])
+            print("[DEBUG END]\n")
 
         # Print comparison row
         row_vals = [f"{i+1}/{len(samples)}", sid[:12]]
