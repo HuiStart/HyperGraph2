@@ -25,7 +25,7 @@ from src.utils.llm_wrapper import LLMWrapper
 
 def main():
     parser = argparse.ArgumentParser(description="Run ablation experiments")
-    parser.add_argument("--variant", choices=["full", "no_hg", "single_agent", "no_evidence", "no_risk"],
+    parser.add_argument("--variant", choices=["full", "no_hg", "single_agent", "no_evidence", "no_risk", "prompt_only"],
                         default="full", help="Ablation variant")
     parser.add_argument("--input", default="data/processed/deepreview_processed.json",
                         help="Input processed data path")
@@ -74,6 +74,14 @@ def main():
             "evidence_count": kwargs.get("evidence", []),
             "conflict_count": len(kwargs.get("conflicts", [])),
         }
+    elif args.variant == "prompt_only":
+        # Pure prompt-only: no workflow, no evidence, no agents
+        from src.scoring.ablation.prompt_only_scorer import PromptOnlyScorer
+        scorer = PromptOnlyScorer(llm)
+        results = scorer.score_batch(samples, output_path=output_path)
+        print(f"\nAblation ({args.variant}) completed.")
+        print(f"Results saved to: {output_path}")
+        return
     else:
         raise ValueError(f"Unknown variant: {args.variant}")
 
